@@ -17,8 +17,7 @@
 
 ---
 
-<!-- TODO: main GIF/screenshot of the taskbar with an open dropdown -->
-<!-- <p align="center"><img src="assets/preview.gif" width="100%" alt="Polynya Preview"></p> -->
+<p align="center"><img src="assets/screenshots/demo.webp" width="100%" alt="Polynya in the Windows 11 taskbar: weather, the launcher and a notification"></p>
 
 **Polynya** is a fast launcher that lives right in the free space of the Windows 11 taskbar and turns it into a living info panel.
 
@@ -68,6 +67,31 @@ The full protocol, manifest and screen row types are described in the **[Module 
 * **Windows notifications (experimental, off by default).** Replaces standard toasts with a compact dropdown from the taskbar (requires a one-time package install with UAC and a `ShowBanner` registry change, because Windows has no official API to turn off other apps' banners).
 
 * **In development: custom Start, devtools and clipboard history.** Not shipped yet, coming in later releases. Custom Start opens a quick menu with system actions and an "About" screen on a lone `Win` press, with all the standard shortcuts working as usual. Devtools convert the selected value on a hotkey: `16px` to `1rem`, colors between HEX/RGB/HSL/OKLCH, a fluid `clamp()`, Unix time, JSON, JWT, Base64 and name casing. Clipboard history keeps what you copied and pastes it back from the island.
+
+---
+
+## Screenshots
+
+<p align="center"><img src="assets/screenshots/desktop.webp" width="100%" alt="The desktop with Polynya in the taskbar"></p>
+
+<p align="center"><img src="assets/screenshots/island.png" width="92%" alt="The island: time, weather, search and the player"></p>
+
+<p align="center"><img src="assets/screenshots/island-chips.png" width="100%" alt="The island with notification chips"></p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-currency.png" width="49%" alt="Launcher: currency conversion">
+  <img src="assets/screenshots/launcher-calc.png" width="49%" alt="Launcher: calculator">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-apps.png" width="49%" alt="Launcher: app and file search">
+  <img src="assets/screenshots/notification.png" width="49%" alt="An expanded notification">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/weather.png" width="49%" alt="Weather forecast">
+  <img src="assets/screenshots/player.png" width="49%" alt="Player">
+</p>
 
 ---
 

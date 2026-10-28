@@ -17,8 +17,7 @@
 
 ---
 
-<!-- TODO: Вставить сюда главную гифку/скриншот панели задач с раскрытием выпадашки -->
-<!-- <p align="center"><img src="assets/preview.gif" width="100%" alt="Polynya Preview"></p> -->
+<p align="center"><img src="assets/screenshots/demo.webp" width="100%" alt="Polynya в панели задач Windows 11: погода, лаунчер и уведомление"></p>
 
 **Polynya** - это быстрый лаунчер, который живет прямо в свободном месте панели задач Windows 11, превращая ее в живую инфо-панель.
 
@@ -68,6 +67,31 @@
 * **Уведомления Windows (экспериментальный, выключен по умолчанию).** Заменяет стандартные тосты компактной выпадашкой из панели задач (требует разовой установки пакета с UAC и правки `ShowBanner` в реестре, так как штатного API для отключения чужих баннеров в Windows нет).
 
 * **В разработке: свой "Пуск", девтулз и история буфера обмена.** Пока не поставляются, появятся в следующих релизах. Свой "Пуск" по одиночному `Win` открывает быстрое меню с системными действиями и экраном "О системе", а стандартные сочетания работают как обычно. Девтулз преобразуют выделенное значение по сочетанию клавиш: `16px` в `1rem`, цвета между HEX/RGB/HSL/OKLCH, резиновый `clamp()`, Unix-время, JSON, JWT, Base64 и регистр имен. История буфера обмена хранит скопированное и вставляет его обратно из острова.
+
+---
+
+## Скриншоты
+
+<p align="center"><img src="assets/screenshots/desktop.webp" width="100%" alt="Рабочий стол с Polynya в панели задач"></p>
+
+<p align="center"><img src="assets/screenshots/island.png" width="92%" alt="Остров: время, погода, поиск и плеер"></p>
+
+<p align="center"><img src="assets/screenshots/island-chips.png" width="100%" alt="Остров с чипами уведомлений"></p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-currency.png" width="49%" alt="Лаунчер: конвертер валют">
+  <img src="assets/screenshots/launcher-calc.png" width="49%" alt="Лаунчер: калькулятор">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-apps.png" width="49%" alt="Лаунчер: поиск программ и файлов">
+  <img src="assets/screenshots/notification.png" width="49%" alt="Раскрытое уведомление">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/weather.png" width="49%" alt="Прогноз погоды">
+  <img src="assets/screenshots/player.png" width="49%" alt="Плеер">
+</p>
 
 ---
 

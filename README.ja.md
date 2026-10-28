@@ -17,8 +17,7 @@
 
 ---
 
-<!-- TODO: main GIF/screenshot of the taskbar with an open dropdown -->
-<!-- <p align="center"><img src="assets/preview.gif" width="100%" alt="Polynya Preview"></p> -->
+<p align="center"><img src="assets/screenshots/demo.webp" width="100%" alt="Windows 11 のタスクバーで動く Polynya：天気、ランチャー、通知"></p>
 
 **Polynya** は、Windows 11 のタスクバーの空きスペースにそのまま住み着き、タスクバーを「生きた」情報パネルに変える高速ランチャーです。
 
@@ -68,6 +67,31 @@
 * **Windows 通知（試験的、既定では無効）。** 標準のトースト通知を、タスクバーから出るコンパクトなドロップダウンに置き換えます（UAC による一度きりのパッケージ インストールと、レジストリの `ShowBanner` の変更が必要です。Windows には他のアプリのバナーをオフにする公式 API がないためです）。
 
 * **開発中：独自のスタート メニュー、開発ツール、クリップボード履歴。** まだ同梱されておらず、今後のリリースで追加されます。独自のスタート メニューは `Win` キーの単独押しで、システム操作と「バージョン情報」画面を備えたクイック メニューを開きます。標準ショートカットはいつもどおり使えます。開発ツールは選択した値をホットキーで変換します：`16px` から `1rem`、HEX/RGB/HSL/OKLCH の色、可変 `clamp()`、Unix 時刻、JSON、JWT、Base64、名前の書式。クリップボード履歴はコピーした内容を保存し、アイランドから貼り付け直せます。
+
+---
+
+## スクリーンショット
+
+<p align="center"><img src="assets/screenshots/desktop.webp" width="100%" alt="タスクバーに Polynya がいるデスクトップ"></p>
+
+<p align="center"><img src="assets/screenshots/island.png" width="92%" alt="アイランド：時刻、天気、検索、プレーヤー"></p>
+
+<p align="center"><img src="assets/screenshots/island-chips.png" width="100%" alt="通知チップ付きのアイランド"></p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-currency.png" width="49%" alt="ランチャー：通貨換算">
+  <img src="assets/screenshots/launcher-calc.png" width="49%" alt="ランチャー：電卓">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-apps.png" width="49%" alt="ランチャー：アプリとファイルの検索">
+  <img src="assets/screenshots/notification.png" width="49%" alt="展開した通知">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/weather.png" width="49%" alt="天気予報">
+  <img src="assets/screenshots/player.png" width="49%" alt="プレーヤー">
+</p>
 
 ---
 

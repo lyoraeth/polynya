@@ -17,8 +17,7 @@
 
 ---
 
-<!-- TODO: main GIF/screenshot of the taskbar with an open dropdown -->
-<!-- <p align="center"><img src="assets/preview.gif" width="100%" alt="Polynya Preview"></p> -->
+<p align="center"><img src="assets/screenshots/demo.webp" width="100%" alt="Windows 11 任务栏中的 Polynya：天气、启动器和通知"></p>
 
 **Polynya** 是一个快速启动器，它直接住在 Windows 11 任务栏的空闲区域里，把任务栏变成一块“活”的信息面板。
 
@@ -68,6 +67,31 @@
 * **Windows 通知（实验性，默认关闭）。** 用从任务栏弹出的紧凑面板替代标准的通知横幅（需要一次性通过 UAC 安装软件包并修改注册表中的 `ShowBanner`，因为 Windows 没有关闭其他应用横幅的官方 API）。
 
 * **开发中：自定义“开始”菜单、开发工具和剪贴板历史。** 尚未随版本提供，将在后续版本中加入。自定义“开始”菜单在单独按下 `Win` 时打开一个快捷菜单，包含系统操作和“关于”页面，标准快捷键照常可用。开发工具用快捷键转换选中的值：`16px` 转 `1rem`、HEX/RGB/HSL/OKLCH 颜色互转、流式 `clamp()`、Unix 时间、JSON、JWT、Base64 和命名风格。剪贴板历史会保存复制过的内容，并能从“岛”中再次粘贴。
+
+---
+
+## 截图
+
+<p align="center"><img src="assets/screenshots/desktop.webp" width="100%" alt="任务栏中带有 Polynya 的桌面"></p>
+
+<p align="center"><img src="assets/screenshots/island.png" width="92%" alt="“岛”：时间、天气、搜索和播放器"></p>
+
+<p align="center"><img src="assets/screenshots/island-chips.png" width="100%" alt="带通知卡片的“岛”"></p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-currency.png" width="49%" alt="启动器：货币换算">
+  <img src="assets/screenshots/launcher-calc.png" width="49%" alt="启动器：计算器">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/launcher-apps.png" width="49%" alt="启动器：搜索程序和文件">
+  <img src="assets/screenshots/notification.png" width="49%" alt="展开的通知">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/weather.png" width="49%" alt="天气预报">
+  <img src="assets/screenshots/player.png" width="49%" alt="播放器">
+</p>
 
 ---
 
