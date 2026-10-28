@@ -1,0 +1,19 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "polynya-agents"
+version = "1.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../../proto" }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_SystemInformation"] }
+
+[build-dependencies]
+embed-resource = "3"

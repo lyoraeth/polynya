@@ -1,0 +1,14 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Polynya Module: Windows notifications routing to the island
+api = 1
+id = "notify"
+name.ru = "Уведомления Windows"
+name.en = "Windows notifications"
+name.zh = "Windows 通知"
+name.ja = "Windows の通知"
+exe = "polynya-notify.exe"
+kind = "zone"
+resident = true
+experimental = true

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) Danil Klimov (lyoraeth) -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+  Package identity manifest for the notifications module.
+  Required by Windows to grant access to UserNotificationListener.
+  The executable itself runs outside the package (external location).
+
+  Unsigned: The OID in Publisher allows installation without a certificate (Windows 11),
+  but requires administrator privileges. Built via tools/package.ps1.
+  When modifying, increment Version and VERSION in src/package.rs.
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 uap10 rescap">
+  <Identity Name="Polynya.Notify" Publisher="CN=Polynya, OID.2.25.311729368913984317654407730594956997722=1" Version="1.0.1.0" ProcessorArchitecture="neutral"/>
+  <Properties>
+    <DisplayName>Polynya notifications</DisplayName>
+    <PublisherDisplayName>Polynya</PublisherDisplayName>
+    <Logo>logo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+  <Resources><Resource Language="en-us"/></Resources>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0"/>
+  </Dependencies>
+  <Capabilities>
+    <uap3:Capability Name="userNotificationListener"/>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+  <Applications>
+    <Application Id="Notify" Executable="polynya-notify.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements DisplayName="Polynya notifications" Description="Polynya notifications" BackgroundColor="transparent" Square150x150Logo="logo.png" Square44x44Logo="logo.png" AppListEntry="none"/>
+    </Application>
+  </Applications>
+</Package>

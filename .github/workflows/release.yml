@@ -1,0 +1,84 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# A `vX.Y.Z` tag builds both architectures and opens a draft release with the installers and the
+# portable archives; it is published by hand after a look. Run by hand (workflow_dispatch), it only
+# leaves the files as a workflow artifact, for a try before tagging.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The exe version comes from `git describe` (tools/winres.rs).
+          fetch-depth: 0
+      - name: Install Rust
+        shell: pwsh
+        run: ./.github/rust.ps1
+      - run: cargo build --release --workspace --locked
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bin-${{ matrix.arch }}
+          path: target/release/polynya*.exe
+          if-no-files-found: error
+
+  package:
+    name: Package
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: bin-*
+          path: bin
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "choco: $LASTEXITCODE" }
+          }
+      - name: Installers and portable archives
+        shell: pwsh
+        run: |
+          foreach ($arch in 'x64', 'arm64') {
+            ./tools/release.ps1 -Arch $arch -Bin "bin/bin-$arch"
+          }
+          Get-ChildItem target/dist | Format-Table Name, Length
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: target/dist/*
+          if-no-files-found: error
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # .github/release-notes.md is the description of this release: rewritten before each tag.
+          gh release create $env:GITHUB_REF_NAME (Get-ChildItem target/dist).FullName --draft --verify-tag --notes-file .github/release-notes.md --title "Polynya $($env:GITHUB_REF_NAME.TrimStart('v'))"
+          if ($LASTEXITCODE -ne 0) { throw "gh release: $LASTEXITCODE" }

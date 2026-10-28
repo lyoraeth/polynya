@@ -1,0 +1,18 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "polynya-notify"
+version = "1.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[dependencies]
+proto = { path = "../../proto" }
+windows = { version = "0.62.2", features = ["Foundation", "Foundation_Collections", "ApplicationModel", "UI_Notifications", "UI_Notifications_Management", "Win32_Foundation", "Win32_System_Com", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_Threading"] }
+
+[build-dependencies]
+embed-resource = "3"

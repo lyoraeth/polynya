@@ -1,0 +1,14 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Polynya Module: Custom Start menu replacement
+api = 1
+id = "start"
+name.ru = "Меню «Пуск»"
+name.en = "Start menu"
+name.zh = "开始菜单"
+name.ja = "スタート メニュー"
+exe = "polynya-start.exe"
+kind = "other"
+resident = true
+taskbar = true

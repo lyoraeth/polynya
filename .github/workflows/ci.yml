@@ -1,0 +1,100 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The exe version comes from `git describe` (tools/winres.rs).
+          fetch-depth: 0
+      - name: Install Rust
+        shell: pwsh
+        run: ./.github/rust.ps1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Notification package matches its sources
+        shell: pwsh
+        run: |
+          # The .msix is committed and embedded into the core: it must be rebuilt after any change
+          # in modules/notify/package (tools/package.ps1) and must stay architecture-neutral.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead("$PWD/modules/notify/polynya-notify.msix")
+          try {
+            foreach ($name in 'AppxManifest.xml', 'logo.png') {
+              $entry = $zip.GetEntry($name)
+              if (-not $entry) { throw "$name is missing from the package" }
+              $buf = New-Object IO.MemoryStream
+              $s = $entry.Open(); $s.CopyTo($buf); $s.Close()
+              $packed = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($buf.ToArray()))
+              $source = (Get-FileHash "modules/notify/package/$name" -Algorithm SHA256).Hash
+              if ($packed -ne $source) { throw "$name in the .msix differs from modules/notify/package: run tools/package.ps1" }
+            }
+          } finally { $zip.Dispose() }
+          [xml]$manifest = Get-Content modules/notify/package/AppxManifest.xml
+          $arch = $manifest.Package.Identity.ProcessorArchitecture
+          if ($arch -ne 'neutral') { throw "ProcessorArchitecture is '$arch', expected 'neutral'" }
+
+  build:
+    name: Build and test (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            machine: 0x8664
+          - arch: arm64
+            runner: windows-11-arm
+            machine: 0xAA64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        shell: pwsh
+        run: ./.github/rust.ps1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --locked
+      - run: cargo build --release --workspace --locked
+      - name: Check the binaries
+        shell: pwsh
+        run: |
+          $exes = Get-ChildItem target/release -Filter 'polynya*.exe'
+          if ($exes.Count -lt 5) { throw "expected the core and 4 module exes, got: $($exes.Name -join ', ')" }
+          foreach ($exe in $exes) {
+            # PE header: the offset of the "PE\0\0" signature is at 0x3C, the machine type follows it.
+            $bytes = [IO.File]::ReadAllBytes($exe.FullName)
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
+            if ($machine -ne ${{ matrix.machine }}) { throw ("{0}: machine 0x{1:X4}, expected ${{ matrix.machine }}" -f $exe.Name, $machine) }
+            # The C runtime is static (.cargo/config.toml): no import of the VC++ Redistributable DLLs.
+            $text = [Text.Encoding]::ASCII.GetString($bytes)
+            if ($text -match '(?i)vcruntime\d+\.dll|msvcp\d+\.dll') { throw "$($exe.Name) imports $($Matches[0])" }
+          }
+          # The core starts and exits by itself on `help`, without bringing up the island.
+          $p = Start-Process target/release/polynya.exe -ArgumentList help -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "polynya help exited with $($p.ExitCode)" }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: polynya-${{ matrix.arch }}
+          path: target/release/polynya*.exe
+          if-no-files-found: error

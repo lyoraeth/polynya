@@ -1,0 +1,9 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Code style: `cargo fmt --all`. Comments are not rewrapped by stable rustfmt;
+# keep them within about 100 columns by hand.
+edition = "2024"
+style_edition = "2024"
+max_width = 160
+use_small_heuristics = "Max"

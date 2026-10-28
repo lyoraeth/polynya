@@ -1,0 +1,35 @@
+<svg width="43" height="45" viewBox="0 0 43 45" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g filter="url(#grain)">
+<use xlink:href="#stroke0_26_606" fill="url(#paint0_linear_26_606)"/>
+<use xlink:href="#stroke0_26_606" fill="black" fill-opacity="0.1"/>
+<use xlink:href="#stroke1_26_606" fill="url(#paint1_linear_26_606)"/>
+<use xlink:href="#stroke1_26_606" fill="black" fill-opacity="0.1"/>
+<path d="M16.896 30.208V44.288H26.24V24.87L43.008 15.104L38.4 7.04L26.24 14.08V0H16.896V19.42L0 29.184L4.608 37.248L16.896 30.208Z" fill="url(#paint2_linear_26_606)"/>
+</g>
+<defs>
+<filter id="grain" filterUnits="userSpaceOnUse" x="0" y="0" width="43" height="45">
+<feTurbulence type="fractalNoise" baseFrequency="7" numOctaves="2" seed="7" stitchTiles="stitch" result="noise"/>
+<feColorMatrix in="noise" type="saturate" values="0" result="mono"/>
+<feComposite in="mono" in2="SourceGraphic" operator="in" result="masked"/>
+<feBlend in="masked" in2="SourceGraphic" mode="overlay" result="blend"/>
+<feComposite in="blend" in2="SourceGraphic" operator="in"/>
+</filter>
+<linearGradient id="paint0_linear_26_606" x1="42.977" y1="-0.293093" x2="-0.0229496" y2="44.7069" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF5A1F"/>
+<stop offset="0.2" stop-color="#E41F18"/>
+<stop offset="0.65" stop-color="#253349"/>
+</linearGradient>
+<linearGradient id="paint1_linear_26_606" x1="42.977" y1="-0.293093" x2="-0.0229496" y2="44.7069" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF5A1F"/>
+<stop offset="0.2" stop-color="#E41F18"/>
+<stop offset="0.65" stop-color="#253349"/>
+</linearGradient>
+<linearGradient id="paint2_linear_26_606" x1="42.9772" y1="-5.71626" x2="-9.70756" y2="38.6782" gradientUnits="userSpaceOnUse">
+<stop offset="0.0528846" stop-color="#FF5A1F"/>
+<stop offset="0.254808" stop-color="#E41F18"/>
+<stop offset="0.75" stop-color="#253349"/>
+</linearGradient>
+<path id="stroke0_26_606" d="M43.0078 29.1836V39.9697L26.2402 30.208V24.8701L30.8838 22.1641L43.0078 29.1836Z"/>
+<path id="stroke1_26_606" d="M16.8965 14.0801V19.4199L0 29.1836L12.1602 22.1436L0 15.1035V4.30957L16.8965 14.0801Z"/>
+</defs>
+</svg>

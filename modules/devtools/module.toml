@@ -1,0 +1,41 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Polynya Module: web development tools. Runs on Node.js, without npm dependencies.
+api = 1
+id = "devtools"
+name.ru = "Девтулз"
+name.en = "Devtools"
+name.zh = "开发工具"
+name.ja = "開発ツール"
+exe = "main.js"
+kind = "search"
+
+
+# The module in search: opens its menu of tools.
+[main]
+hint.ru = "Веб-утилиты"
+hint.en = "Web utilities"
+hint.zh = "Web 工具"
+hint.ja = "Web ツール"
+keywords = ["devtools", "dev", "девтулз", "разработка", "px", "rem", "clamp", "json", "base64", "uuid", "hash", "开发", "開発"]
+# Lucide "code-xml" icon (ISC)
+icon = "m18 16 4-4-4-4 | m6 8-4 4 4 4 | m14.5 4-5 16"
+
+# The converter from the menu, also in search and on a hotkey: by the hotkey it takes the selection,
+# e.g. font-size: 16px -> font-size: 1rem. The title is the same as in the menu.
+[[functions]]
+id = "convert"
+title.ru = "Преобразовать значение"
+title.en = "Convert value"
+title.zh = "转换值"
+title.ja = "値を変換"
+hint.ru = "Единицы, цвета"
+hint.en = "Units, colors"
+hint.zh = "单位、颜色"
+hint.ja = "単位、色"
+keywords = ["convert", "преобразовать", "конвертер", "px", "rem", "hex", "rgb", "oklch", "转换", "変換"]
+# Lucide "arrow-left-right" icon (ISC)
+icon = "M8 3 4 7l4 4 | M4 7h16 | m16 21 4-4-4-4 | M20 17H4"
+hotkey = "Ctrl+Alt+D"
+selection = true

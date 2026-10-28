@@ -1,0 +1,6 @@
+# A fixed version, so a new Rust release cannot break the build or bring new clippy lints on its
+# own. The target is left to each machine's host (CI builds with MSVC, see .cargo/config.toml).
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

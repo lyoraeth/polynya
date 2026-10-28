@@ -1,0 +1,13 @@
+/target
+
+# Local working materials, not part of the project
+/.devstorage/
+/mock/
+/БЭКЛОГ.md
+
+# Editors and OS
+.vscode/
+.idea/
+*.log
+Thumbs.db
+desktop.ini

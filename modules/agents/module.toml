@@ -1,0 +1,13 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Polynya Module: AI agents status tracking (Claude Code, Codex, Cursor)
+api = 1
+id = "agents"
+name.ru = "Агенты"
+name.en = "AI agents"
+name.zh = "AI 代理"
+name.ja = "AI エージェント"
+exe = "polynya-agents.exe"
+kind = "zone"
+hooks = true

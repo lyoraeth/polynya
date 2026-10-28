@@ -1,0 +1,4 @@
+# The C runtime is linked into the exe: an MSVC build would otherwise need the Visual C++
+# Redistributable on the user's machine. GNU builds link their runtime statically anyway.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
