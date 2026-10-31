@@ -23,7 +23,7 @@ Polynya 为所有来源提供一个共享的通知堆栈：核心的内置指示
 
 ---
 
-## 2. AI 代理（Claude Code、Codex、Cursor）
+## 2. AI 代理（Claude Code、Codex、Cursor、Kimi Code）
 
 内置的 `agents` 模块把本地 AI 代理的工作状态直接显示在任务栏中。当你切换到浏览器或其他窗口时，也能看到代理在做什么：*“思考中…”*、*“编辑中 main.rs”*、*“等待中…”*、*“完成”* 或 *“错误”*。代理工作期间，卡片图标是动态的（Claude 的专属字形，或以 60° 为步进转动的 Polynya 标志）。
 
@@ -33,6 +33,7 @@ Polynya 为所有来源提供一个共享的通知堆栈：核心的内置指示
 1. **Claude Code（`~/.claude/settings.json`）：** 为 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Notification`、`Stop` 和 `SessionEnd` 事件注册钩子。程序路径使用正斜杠（`/`）写入，因为 Claude Code 通过 bash 环境调用钩子。
 2. **Codex（`~/.codex/config.toml`）：** 在 `notify` 字段中注册处理程序。
 3. **Cursor（`~/.cursor/hooks.json`）：** 为 `beforeSubmitPrompt`、`afterFileEdit`、`afterShellExecution`、`stop` 和 `sessionEnd` 注册钩子。
+4. **Kimi Code（`~/.kimi-code/config.toml`）：** 为 `TurnStarted`、`UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`PermissionRequest`、`Stop`、`StopFailure`、`Interrupt` 和 `SessionEnd` 写入 `[[hooks]]` 记录，包括后台回合和权限等待。
 
 `polynya-agents.exe` 本身不会常驻内存：代理在事件发生时调用它，程序在几毫秒内把一条 JSON 消息发到“岛”的管道后立即退出（如果“岛”没有运行，它会马上退出，并且总是返回成功代码：模块的错误不应妨碍代理工作）。
 

@@ -62,7 +62,7 @@
 
 ### 随附模块
 
-* **AI 代理（Claude Code、Codex、Cursor）。** 显示代理正在思考、编辑文件、等待输入或已完成任务。启用模块时自动注册钩子，无需手动折腾配置。
+* **AI 代理（Claude Code、Codex、Cursor、Kimi Code）。** 显示代理正在思考、编辑文件、等待输入或已完成任务。启用模块时自动注册钩子，无需手动折腾配置。
 * **取色器。** 从启动器打开一个不冻结屏幕的实时放大镜，复制十六进制颜色值，并把颜色展开为 11 级 **OKLCH** 色阶（类似 Tailwind 色阶）。
 * **Windows 通知（实验性，默认关闭）。** 用从任务栏弹出的紧凑面板替代标准的通知横幅（需要一次性通过 UAC 安装软件包并修改注册表中的 `ShowBanner`，因为 Windows 没有关闭其他应用横幅的官方 API）。
 
@@ -110,7 +110,7 @@ Raycast 和 PowerToys 这样的启动器遵循“需要时按快捷键调用”�
 | **计算器与货币** | 是（函数、比较、字符串、汇率） | 是 | 是（货币通过插件） |
 | **播放器与可视化** | **是**（只监听播放器进程的声音） | 否 | 否 |
 | **通知堆栈与 CLI（`push`）** | **是**（Windows、终端、你的脚本） | 否 | 否 |
-| **AI 代理状态** | **是**（Claude Code、Codex、Cursor，无需配置） | 否 | 否 |
+| **AI 代理状态** | **是**（Claude Code、Codex、Cursor、Kimi Code，无需配置） | 否 | 否 |
 | **OKLCH 取色器** | **是** | 否 | 否（取色器是套件中的独立工具） |
 | **剪贴板历史、片段、窗口管理** | 否 | **是** | 否（PowerToys 中的独立工具） |
 | **AI 聊天** | 否 | **是**（付费） | 否 |
@@ -177,7 +177,7 @@ polynya modules reload
 ## 文档
 
 * **[用户指南](docs/zh/guide.md)**：“岛”的各个区块、搜索、播放器和天气如何工作，所有 `config.ini` 键和 CLI。
-* **[通知与 AI 代理](docs/zh/notifications.md)**：队列与系列规则、Claude Code / Codex / Cursor 的自动钩子，以及 Windows 通知截获的工作原理。
+* **[通知与 AI 代理](docs/zh/notifications.md)**：队列与系列规则、Claude Code / Codex / Cursor / Kimi Code 的自动钩子，以及 Windows 通知截获的工作原理。
 * **[已知限制与常见问题](docs/zh/troubleshooting.md)**：边界情况（Windhawk、VPN 下的 Spotify 封面、Telegram Desktop 等）。
 * **[模块 API](docs/zh/module-api.md)** 与 **[示例](docs/zh/module-examples.md)**：`module.toml` 规范、协议、快捷键与所选内容，以及从零开始的模块。
 * **[架构](docs/zh/architecture.md)**：为什么用 DirectComposition 而不是交换链、如何采集任务栏颜色、OKLCH/APCA 的数学原理，以及解决过的各种棘手问题。

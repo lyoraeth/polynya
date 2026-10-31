@@ -82,7 +82,7 @@ The launcher covers launching software, calling built-in commands, file search a
 Everything beyond the launcher, time and weather, player and notification stack is done by modules. They are turned on and off in the settings (section 6); writing your own is covered in the [Module API](module-api.md).
 
 ### AI agents (`agents` module)
-Shows the status of Claude Code, Codex and Cursor in the notification stack: the agent is thinking, editing a file, waiting for input or done. The hooks are written into the agents' configs when the module is turned on and removed when it is turned off. Details: [Notifications, AI agents and the terminal](notifications.md).
+Shows the status of Claude Code, Codex, Cursor and Kimi Code in the notification stack: the agent is thinking, editing a file, waiting for input or done. The hooks are written into the agents' configs when the module is turned on and removed when it is turned off. Details: [Notifications, AI agents and the terminal](notifications.md).
 
 ### Color picker (`picker` module)
 Called with the **"Color picker"** command from the launcher.

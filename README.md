@@ -62,7 +62,7 @@ The full protocol, manifest and screen row types are described in the **[Module 
 
 ### Bundled modules
 
-* **AI agents (Claude Code, Codex, Cursor).** Shows when an agent is thinking, editing a file, waiting for input or done with a task. Hooks are registered automatically when the module is enabled, no manual config fiddling.
+* **AI agents (Claude Code, Codex, Cursor, Kimi Code).** Shows when an agent is thinking, editing a file, waiting for input or done with a task. Hooks are registered automatically when the module is enabled, no manual config fiddling.
 * **Color picker.** The launcher opens a live loupe without freezing the screen; it copies the hex value and expands the color into 11 **OKLCH** shades (like a Tailwind scale).
 * **Windows notifications (experimental, off by default).** Replaces standard toasts with a compact dropdown from the taskbar (requires a one-time package install with UAC and a `ShowBanner` registry change, because Windows has no official API to turn off other apps' banners).
 
@@ -110,7 +110,7 @@ Launchers like Raycast and PowerToys work as "call it with a hotkey when needed"
 | **Calculator and currencies** | Yes (functions, comparisons, strings, exchange rates) | Yes | Yes (currencies via plugins) |
 | **Player and visualizer** | **Yes** (listens to the player process only) | No | No |
 | **Notification stack and CLI (`push`)** | **Yes** (Windows, terminal, your scripts) | No | No |
-| **AI agent status** | **Yes** (Claude Code, Codex, Cursor, no setup) | No | No |
+| **AI agent status** | **Yes** (Claude Code, Codex, Cursor, Kimi Code, no setup) | No | No |
 | **OKLCH color picker** | **Yes** | No | No (the picker is a separate utility in the suite) |
 | **Clipboard history, snippets, window management** | No | **Yes** | No (separate PowerToys utilities) |
 | **AI chat** | No | **Yes** (paid) | No |
@@ -177,7 +177,7 @@ polynya modules reload
 ## Documentation
 
 * **[User guide](docs/guide.md)**: how the island's blocks, search, player and weather work, every `config.ini` key and the CLI.
-* **[Notifications and AI agents](docs/notifications.md)**: queue and series rules, automatic hooks for Claude Code / Codex / Cursor, and how Windows toast capture works.
+* **[Notifications and AI agents](docs/notifications.md)**: queue and series rules, automatic hooks for Claude Code / Codex / Cursor / Kimi Code, and how Windows toast capture works.
 * **[Known limitations and FAQ](docs/troubleshooting.md)**: edge cases (Windhawk, Spotify covers behind a VPN, Telegram Desktop and more).
 * **[Module API](docs/module-api.md)** and **[examples](docs/module-examples.md)**: the `module.toml` spec, the protocol, hotkeys and the selection, and modules from scratch.
 * **[Architecture](docs/architecture.md)**: why DirectComposition instead of a swap chain, how the taskbar color is captured, the OKLCH/APCA math and the tricky problems solved along the way.

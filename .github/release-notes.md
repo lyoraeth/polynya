@@ -24,7 +24,7 @@ Requires Windows 11. Windows 10 is not supported.
 
 ### Bundled modules
 
-- **AI agents**: the status of Claude Code, Codex and Cursor in the taskbar; the hooks are set up automatically.
+- **AI agents**: the status of Claude Code, Codex, Cursor and Kimi Code in the taskbar; the hooks are set up automatically.
 - **Color picker**: a live loupe and an OKLCH palette.
 - **Windows notifications** (experimental, off by default): system notifications in the island instead of the standard banners. Installing it asks for UAC once.
 

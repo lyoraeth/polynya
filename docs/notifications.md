@@ -23,7 +23,7 @@ The island's right zone follows strict rules so that frequent status updates don
 
 ---
 
-## 2. AI agents (Claude Code, Codex, Cursor)
+## 2. AI agents (Claude Code, Codex, Cursor, Kimi Code)
 
 The built-in `agents` module shows the status of local AI agents right in the taskbar. You see what the agent is doing while you switch to the browser or another window: *"Thinking…"*, *"Editing main.rs"*, *"Waiting…"*, *"Done"* or *"Error"*. While the agent works, the chip icon is animated (Claude's own glyph, or the Polynya mark turning in 60° steps).
 
@@ -33,6 +33,7 @@ When the `agents` module is enabled, the core calls `polynya-agents.exe register
 1. **Claude Code (`~/.claude/settings.json`):** hooks for the `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop` and `SessionEnd` events. The binary path is written with forward slashes (`/`), because Claude Code runs hooks through a bash environment.
 2. **Codex (`~/.codex/config.toml`):** a handler in the `notify` field.
 3. **Cursor (`~/.cursor/hooks.json`):** hooks for `beforeSubmitPrompt`, `afterFileEdit`, `afterShellExecution`, `stop` and `sessionEnd`.
+4. **Kimi Code (`~/.kimi-code/config.toml`):** `[[hooks]]` entries for `TurnStarted`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `Stop`, `StopFailure`, `Interrupt` and `SessionEnd`, including background turns and permission waits.
 
 `polynya-agents.exe` itself does not stay in memory: the agent calls it on an event, the binary drops a JSON message into the island's pipe within a couple of milliseconds and exits (if the island is not running, it exits right away, always with a success code: a module error must not get in the agent's way).
 

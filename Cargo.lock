@@ -143,6 +143,7 @@ dependencies = [
  "embed-resource",
  "proto",
  "serde_json",
+ "toml",
  "windows",
 ]
 

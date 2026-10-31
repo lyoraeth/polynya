@@ -9,6 +9,8 @@ use serde_json::{Value, json};
 
 const CLAUDE_EVENTS: [&str; 6] = ["UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop", "SessionEnd"];
 const CURSOR_EVENTS: [&str; 5] = ["beforeSubmitPrompt", "afterFileEdit", "afterShellExecution", "stop", "sessionEnd"];
+const KIMI_EVENTS: [&str; 9] =
+    ["TurnStarted", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "StopFailure", "Interrupt", "SessionEnd"];
 
 fn home() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE").map(PathBuf::from)
@@ -43,6 +45,14 @@ pub fn sync(add: bool) {
     }
     if home.join(".cursor").is_dir() {
         update_json(&home.join(".cursor").join("hooks.json"), |v| merge_cursor(v, &command(&exe, "cursor"), &name, add));
+    }
+    let kimi = home.join(".kimi-code");
+    if kimi.is_dir() {
+        let path = kimi.join("config.toml");
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        if let Some(new) = merge_kimi(&text, &exe, &name, add) {
+            write(&path, &new);
+        }
     }
     let codex = home.join(".codex");
     if codex.is_dir() {
@@ -205,6 +215,57 @@ fn merge_codex(text: &str, exe: &str, exe_name: &str, add: bool) -> Option<Strin
     }
 }
 
+/// Updates Kimi Code's `[[hooks]]` array without touching foreign hooks or other config values.
+fn merge_kimi(text: &str, exe: &str, exe_name: &str, add: bool) -> Option<String> {
+    let cmd = command(exe, "kimi");
+    let mut table = toml::from_str::<toml::value::Table>(text).map_err(|e| proto::warn!("agents", "hooks: Kimi config.toml not parsed, skipped: {e}")).ok()?;
+    if !add && !table.contains_key("hooks") {
+        return None;
+    }
+    let Some(list) = table.entry("hooks").or_insert_with(|| toml::Value::Array(Vec::new())).as_array_mut() else {
+        proto::warn!("agents", "hooks: Kimi config.toml has a non-array hooks value, skipped");
+        return None;
+    };
+    let mut found = [false; KIMI_EVENTS.len()];
+    let mut changed = false;
+    list.retain(|hook| {
+        let command = hook.get("command").and_then(toml::Value::as_str).unwrap_or("");
+        if !is_ours(command, exe_name, "kimi") {
+            return true;
+        }
+        let event = hook.get("event").and_then(toml::Value::as_str).unwrap_or("");
+        if add
+            && command == cmd
+            && let Some(i) = KIMI_EVENTS.iter().position(|e| *e == event)
+            && !found[i]
+        {
+            found[i] = true;
+            return true;
+        }
+        changed = true;
+        false
+    });
+    if add {
+        for (i, event) in KIMI_EVENTS.iter().enumerate() {
+            if found[i] {
+                continue;
+            }
+            let mut hook = toml::value::Table::new();
+            hook.insert("event".into(), toml::Value::String((*event).into()));
+            hook.insert("command".into(), toml::Value::String(cmd.clone()));
+            hook.insert("timeout".into(), toml::Value::Integer(5));
+            list.push(toml::Value::Table(hook));
+            changed = true;
+        }
+    } else if changed && list.is_empty() {
+        table.remove("hooks");
+    }
+    if !changed {
+        return None;
+    }
+    toml::to_string_pretty(&table).map_err(|e| proto::warn!("agents", "hooks: Kimi config.toml not serialized, skipped: {e}")).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,6 +311,30 @@ mod tests {
         assert!(!merge_cursor(&mut v, cmd, EXE, true));
         assert!(merge_cursor(&mut v, cmd, EXE, false));
         assert!(v["hooks"].as_object().unwrap().is_empty());
+    }
+
+    #[test]
+    fn kimi_merge_is_idempotent_and_preserves_foreign_hooks() {
+        let exe = r"C:\m\polynya-agents.exe";
+        let input = "model = \"k2\"\n\n[[hooks]]\nevent = \"Stop\"\ncommand = \"other-hook\"\ntimeout = 10\n";
+        let new = merge_kimi(input, exe, EXE, true).unwrap();
+        assert!(merge_kimi(&new, exe, EXE, true).is_none());
+        let parsed = toml::from_str::<toml::Value>(&new).unwrap();
+        let hooks = parsed["hooks"].as_array().unwrap();
+        assert_eq!(hooks.len(), KIMI_EVENTS.len() + 1);
+        assert!(hooks.iter().any(|h| h["command"].as_str() == Some("other-hook")));
+        assert!(hooks.iter().any(|h| h["event"].as_str() == Some("PermissionRequest")));
+
+        let removed = merge_kimi(&new, exe, EXE, false).unwrap();
+        assert!(merge_kimi(&removed, exe, EXE, false).is_none());
+        let parsed = toml::from_str::<toml::Value>(&removed).unwrap();
+        assert_eq!(parsed["hooks"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["model"].as_str(), Some("k2"));
+
+        let ours = merge_kimi("", exe, EXE, true).unwrap();
+        let removed = merge_kimi(&ours, exe, EXE, false).unwrap();
+        assert!(!removed.contains("[[hooks]]"));
+        assert!(merge_kimi("not = [", exe, EXE, true).is_none());
     }
 
     #[test]

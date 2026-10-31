@@ -23,7 +23,7 @@
 
 ---
 
-## 2. ИИ-агенты (Claude Code, Codex, Cursor)
+## 2. ИИ-агенты (Claude Code, Codex, Cursor, Kimi Code)
 
 Встроенный модуль `agents` выводит статус работы локальных ИИ-агентов прямо в панель задач. Вы видите, что делает агент, пока переключились в браузер или другое окно: *"Думает…"*, *"Редактирует main.rs"*, *"Ожидание…"*, *"Готово"* или *"Ошибка"*. Пока агент работает, иконка на чипе анимирована (фирменный глиф для Claude или вращающийся рывками по 60° знак Polynya).
 
@@ -33,6 +33,7 @@
 1. **Claude Code (`~/.claude/settings.json`):** прописываются хуки на события `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop` и `SessionEnd`. Путь к бинарнику записывается с прямыми слэшами (`/`), так как Claude Code вызывает хуки через окружение bash.
 2. **Codex (`~/.codex/config.toml`):** прописывается обработчик в поле `notify`.
 3. **Cursor (`~/.cursor/hooks.json`):** прописываются хуки на `beforeSubmitPrompt`, `afterFileEdit`, `afterShellExecution`, `stop` и `sessionEnd`.
+4. **Kimi Code (`~/.kimi-code/config.toml`):** записи `[[hooks]]` для `TurnStarted`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `Stop`, `StopFailure`, `Interrupt` и `SessionEnd`, включая фоновые ходы и ожидание разрешений.
 
 Сам `polynya-agents.exe` не висит в памяти постоянно: агент вызывает его на событии, бинарник за пару миллисекунд кидает JSON в канал острова и сразу закрывается (если остров не запущен - сразу выходит, причем всегда с кодом успеха: ошибка модуля не должна мешать агенту).
 

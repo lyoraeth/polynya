@@ -23,7 +23,7 @@ Polynya には、すべての発信元が共有する 1 つの通知スタック
 
 ---
 
-## 2. AI エージェント（Claude Code、Codex、Cursor）
+## 2. AI エージェント（Claude Code、Codex、Cursor、Kimi Code）
 
 内蔵の `agents` モジュールは、ローカルの AI エージェントの作業状態をタスクバーに直接表示します。ブラウザーや別のウィンドウに切り替えていても、エージェントが何をしているかがわかります：*「思考中…」*、*「編集中 main.rs」*、*「応答待ち…」*、*「完了」*、*「エラー」*。エージェントの作業中はチップのアイコンが動きます（Claude 独自のグリフ、または 60° ずつ回転する Polynya のマーク）。
 
@@ -33,6 +33,7 @@ Polynya には、すべての発信元が共有する 1 つの通知スタック
 1. **Claude Code（`~/.claude/settings.json`）：** `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Notification`、`Stop`、`SessionEnd` イベントのフックを登録します。Claude Code はフックを bash 環境で実行するため、実行ファイルのパスはスラッシュ（`/`）で書き込みます。
 2. **Codex（`~/.codex/config.toml`）：** `notify` フィールドにハンドラーを登録します。
 3. **Cursor（`~/.cursor/hooks.json`）：** `beforeSubmitPrompt`、`afterFileEdit`、`afterShellExecution`、`stop`、`sessionEnd` のフックを登録します。
+4. **Kimi Code（`~/.kimi-code/config.toml`）：** `TurnStarted`、`UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`PermissionRequest`、`Stop`、`StopFailure`、`Interrupt`、`SessionEnd` の `[[hooks]]` エントリーを登録します。バックグラウンドのターンと権限待ちにも対応します。
 
 `polynya-agents.exe` 自体は常駐しません。エージェントがイベントのたびに呼び出し、数ミリ秒でアイランドのパイプに JSON を送ってすぐに終了します（アイランドが起動していなければすぐに終了し、終了コードは常に成功です。モジュールのエラーでエージェントの作業を妨げてはいけないためです）。
 

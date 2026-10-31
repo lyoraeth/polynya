@@ -116,6 +116,32 @@ pub fn claude(v: &Value, tr: &Strings) -> Option<Msg> {
     })
 }
 
+/// Parses a Kimi Code hook event.
+///
+/// Covers foreground and background turns, tool activity, permission waits, failures and interruption.
+/// One session is one chip; the Polynya mark rotates while Kimi works.
+pub fn kimi(v: &Value, tr: &Strings) -> Option<Msg> {
+    let s = |k: &str| v[k].as_str().unwrap_or("");
+    let key = format!("kimi:{}", s("session_id"));
+    let project = file_name(s("cwd"));
+    let note = |icon: &str, state: &str, detail: String, ttl: Option<u64>| {
+        chip(key.clone(), icon, format!("Kimi · {state}"), &project, &detail, "Kimi Code", ttl, icon == "agent")
+    };
+    Some(match s("hook_event_name") {
+        "TurnStarted" | "UserPromptSubmit" => note("agent", tr.thinking, String::new(), None),
+        "PreToolUse" if s("tool_name") == "AskUserQuestion" => {
+            let q = &v["tool_input"]["questions"][0];
+            note("key", tr.waiting, q["question"].as_str().or(q["header"].as_str()).unwrap_or("").to_string(), None)
+        }
+        "PreToolUse" | "PostToolUse" => note("agent", tr.thinking, action(s("tool_name"), &v["tool_input"], tr), None),
+        "PermissionRequest" => note("key", tr.waiting, action(s("tool_name"), &v["tool_input"], tr), None),
+        "Stop" => note("ok", tr.done, String::new(), Some(DONE_TTL)),
+        "StopFailure" => note("fail", tr.error, String::new(), Some(DONE_TTL)),
+        "Interrupt" | "SessionEnd" => Msg::Dismiss { key },
+        _ => return None,
+    })
+}
+
 /// Parses a Cursor hook event.
 ///
 /// Cursor has no permission request among its fire-and-forget events, so only thinking → done
@@ -190,6 +216,30 @@ mod tests {
         assert_eq!((key.as_str(), title.as_str(), body.as_str()), ("cursor:c1", "Cursor · Done", "site"));
         let v = serde_json::json!({ "hook_event_name": "stop", "status": "aborted", "conversation_id": "c1" });
         assert!(matches!(cursor(&v, &EN), Some(Msg::Dismiss { .. })));
+    }
+
+    #[test]
+    fn kimi_events_cover_the_turn_lifecycle() {
+        let mut v = serde_json::json!({
+            "hook_event_name": "TurnStarted",
+            "session_id": "k1",
+            "cwd": r"C:\Projects\site"
+        });
+        let Some(Msg::Chip { key, title, animated, .. }) = kimi(&v, &EN) else { panic!() };
+        assert_eq!((key.as_str(), title.as_str(), animated), ("kimi:k1", "Kimi · Thinking…", true));
+
+        v["hook_event_name"] = serde_json::json!("PermissionRequest");
+        v["tool_name"] = serde_json::json!("Bash");
+        v["tool_input"] = serde_json::json!({ "command": "cargo test" });
+        let Some(Msg::Chip { title, body, animated, .. }) = kimi(&v, &EN) else { panic!() };
+        assert_eq!((title.as_str(), body.as_str(), animated), ("Kimi · Waiting…", "site · cargo test", false));
+
+        v["hook_event_name"] = serde_json::json!("StopFailure");
+        let Some(Msg::Chip { title, icon, .. }) = kimi(&v, &EN) else { panic!() };
+        assert_eq!((title.as_str(), icon.as_str()), ("Kimi · Error", "fail"));
+
+        v["hook_event_name"] = serde_json::json!("SessionEnd");
+        assert!(matches!(kimi(&v, &EN), Some(Msg::Dismiss { key }) if key == "kimi:k1"));
     }
 
     #[test]

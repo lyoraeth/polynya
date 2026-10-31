@@ -5,7 +5,7 @@
 //!
 //! Usage:
 //! - `polynya-agents register | unregister` (called by core to manage hooks)
-//! - `polynya-agents claude | cursor` (called by agent hooks, reads JSON from stdin)
+//! - `polynya-agents claude | cursor | kimi` (called by agent hooks, reads JSON from stdin)
 //! - `polynya-agents codex <event>` (called by Codex notify, event as last arg)
 //!
 //! The hook stays silent and always exits successfully: a module error must not get in the agent's way.
@@ -33,6 +33,7 @@ fn main() {
         Some("unregister") => return hooks::sync(false),
         Some("claude") => stdin_json().and_then(|v| events::claude(&v, tr)),
         Some("cursor") => stdin_json().and_then(|v| events::cursor(&v, tr)),
+        Some("kimi") => stdin_json().and_then(|v| events::kimi(&v, tr)),
         Some("codex") => args.last().and_then(|a| serde_json::from_str::<Value>(a).ok()).and_then(|v| events::codex(&v, tr)),
         _ => None,
     };
