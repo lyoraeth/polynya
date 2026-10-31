@@ -201,6 +201,7 @@ pub fn main() -> Screen {
     }
     rows.push(Row::Divider);
     rows.push(item("config", tr.open_config, String::new()));
+    rows.push(item("logs", tr.logs, String::new()));
     rows.push(item("about", tr.about, String::new()));
     Screen { title: Some(tr.menu_settings.into()), rows }
 }
@@ -245,6 +246,17 @@ pub fn modules_screen() -> Screen {
     rows.push(Row::Divider);
     rows.push(item("mod.folder", tr.modules_folder, String::new()));
     Screen { title: Some(tr.set_modules.into()), rows }
+}
+
+fn logs_screen() -> Screen {
+    let tr = i18n::t();
+    Screen {
+        title: Some(tr.logs.into()),
+        rows: vec![
+            Row::Toggle { id: "log.debug".into(), text: tr.log_debug.into(), on: proto::log_debug() },
+            Row::Button { id: "log.folder".into(), text: tr.logs_folder.into(), plain: false },
+        ],
+    }
 }
 
 fn city_screen() -> Screen {
@@ -334,10 +346,24 @@ pub fn select(id: &str, text: Option<String>) -> (Act, Option<Change>) {
         }
         "city" => (Act::Push(city_screen()), None),
         "modules" => (Act::Push(modules_screen()), None),
+        "logs" => (Act::Push(logs_screen()), None),
         "about" => (Act::Push(about_screen()), None),
         "restart" => (Act::Restart, None),
         "config" => {
             open(&config::path().to_string_lossy());
+            (Act::None, None)
+        }
+        "log.debug" => {
+            let on = !proto::log_debug();
+            config::set("log", if on { "debug" } else { "" });
+            proto::set_log_debug(on);
+            (here(logs_screen()), None)
+        }
+        "log.folder" => {
+            if let Some(d) = proto::log_dir() {
+                let _ = std::fs::create_dir_all(&d);
+                open(&d.to_string_lossy());
+            }
             (Act::None, None)
         }
         "mod.folder" => {
@@ -414,5 +440,24 @@ fn open(target: &str) {
     // SAFETY: the verb and target strings outlive the call; other pointers are null.
     unsafe {
         ShellExecuteW(None, windows::core::w!("open"), &HSTRING::from(target), None, None, SW_SHOWNORMAL);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn logs_link_follows_config() {
+        let rows = main().rows;
+        let config = rows.iter().position(|r| matches!(r, Row::Item { id, .. } if id == "config")).unwrap();
+        assert!(matches!(rows.get(config + 1), Some(Row::Item { id, .. }) if id == "logs"));
+    }
+
+    #[test]
+    fn logs_screen_controls() {
+        let screen = logs_screen();
+        assert!(matches!(&screen.rows[0], Row::Toggle { id, .. } if id == "log.debug"));
+        assert!(matches!(&screen.rows[1], Row::Button { id, .. } if id == "log.folder"));
     }
 }

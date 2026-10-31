@@ -161,11 +161,13 @@ fn run(state: Arc<Mutex<State>>, notify: fn(), rx: mpsc::Receiver<Cmd>) -> Resul
     choose(&shared);
     let s = shared.clone();
     manager.CurrentSessionChanged(&TypedEventHandler::new(move |_, _| {
+        proto::debug!("media", "event: current session");
         choose(&s);
         Ok(())
     }))?;
     let s = shared.clone();
     manager.SessionsChanged(&TypedEventHandler::new(move |_, _| {
+        proto::debug!("media", "event: session list");
         watch_all(&s);
         choose(&s);
         Ok(())
@@ -199,25 +201,46 @@ fn watch_all(shared: &Arc<Shared>) {
     for (s, t) in watched.drain(..) {
         let _ = s.RemovePlaybackInfoChanged(t);
     }
-    let Ok(sessions) = shared.manager.GetSessions() else { return };
+    let sessions = match shared.manager.GetSessions() {
+        Ok(sessions) => sessions,
+        Err(e) => {
+            proto::warn!("media", "watch sessions: {e}");
+            return;
+        }
+    };
     for s in sessions {
         let sh = shared.clone();
-        if let Ok(t) = s.PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| {
+        match s.PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| {
             choose(&sh);
             Ok(())
         })) {
-            watched.push((s, t));
+            Ok(t) => watched.push((s, t)),
+            Err(e) => proto::warn!("media", "watch playback for {}: {e}", app_id(&s)),
         }
     }
 }
 
 /// Picks a session by the rule in the module header and switches if it is a different one.
 fn choose(shared: &Arc<Shared>) {
-    let sessions: Vec<Session> = shared.manager.GetSessions().map(|v| v.into_iter().collect()).unwrap_or_default();
+    let sessions: Vec<Session> = match shared.manager.GetSessions() {
+        Ok(sessions) => sessions.into_iter().collect(),
+        Err(e) => {
+            proto::warn!("media", "choose session: {e}");
+            return;
+        }
+    };
     let system = shared.manager.GetCurrentSession().ok();
     let system_app = system.as_ref().map(app_id);
     let held = shared.current.lock().ok().and_then(|c| c.as_ref().map(|c| c.app.clone()));
     let playing: Vec<&Session> = sessions.iter().filter(|s| is_playing(s)).collect();
+    proto::debug!(
+        "media",
+        "choose: {} sessions, {} playing, system {}, held {}",
+        sessions.len(),
+        playing.len(),
+        system_app.as_deref().unwrap_or("-"),
+        held.as_deref().unwrap_or("-")
+    );
     let pick = if !playing.is_empty() {
         // Of several playing, the Windows current one, otherwise the one we are on.
         playing
@@ -262,6 +285,7 @@ fn attach(shared: &Arc<Shared>, session: Option<Session>) {
     let (s1, s2, s3) = (shared.clone(), shared.clone(), shared.clone());
     let tokens = [
         session.MediaPropertiesChanged(&TypedEventHandler::new(move |s: windows::core::Ref<Session>, _| {
+            proto::debug!("media", "event: properties");
             if let Ok(s) = s.ok() {
                 refresh_properties(&s1, s, "properties");
                 recheck_properties(&s1, s);
@@ -271,6 +295,7 @@ fn attach(shared: &Arc<Shared>, session: Option<Session>) {
         // Properties are also reread on playback events: Spotify's properties event runs ahead of the
         // properties, and a second one may not come.
         session.PlaybackInfoChanged(&TypedEventHandler::new(move |s: windows::core::Ref<Session>, _| {
+            proto::debug!("media", "event: playback");
             // A status change also changes position extrapolation; reread both.
             if let Ok(s) = s.ok() {
                 refresh_playback(&s2, s);
@@ -279,6 +304,7 @@ fn attach(shared: &Arc<Shared>, session: Option<Session>) {
             Ok(())
         })),
         session.TimelinePropertiesChanged(&TypedEventHandler::new(move |s: windows::core::Ref<Session>, _| {
+            proto::debug!("media", "event: timeline");
             if let Ok(s) = s.ok() {
                 refresh_playback(&s3, s);
                 refresh_properties(&s3, s, "timeline");
@@ -286,6 +312,11 @@ fn attach(shared: &Arc<Shared>, session: Option<Session>) {
             Ok(())
         })),
     ];
+    for (result, event) in tokens.iter().zip(["properties", "playback", "timeline"]) {
+        if let Err(e) = result {
+            proto::warn!("media", "subscribe {event}: {e}");
+        }
+    }
     let tokens = tokens.map(|t| t.unwrap_or_default());
     *current = Some(Current { session: session.clone(), app: app.clone(), tokens });
     drop(current);
@@ -323,7 +354,13 @@ fn refresh_properties(shared: &Arc<Shared>, session: &Session, why: &str) {
     if !is_current(shared, session) {
         return;
     }
-    let Ok(props) = session.TryGetMediaPropertiesAsync().and_then(|op| op.join()) else { return };
+    let props = match session.TryGetMediaPropertiesAsync().and_then(|op| op.join()) {
+        Ok(props) => props,
+        Err(e) => {
+            proto::warn!("media", "properties ({why}): {e}");
+            return;
+        }
+    };
     let track = Track {
         title: props.Title().map(|s| s.to_string()).unwrap_or_default(),
         artist: props.Artist().map(|s| s.to_string()).unwrap_or_default(),
@@ -332,6 +369,7 @@ fn refresh_properties(shared: &Arc<Shared>, session: &Session, why: &str) {
     // An empty title: the player is open but nothing is selected. For a playing one it is the instant
     // between tracks (Spotify), and "nothing playing" would blink on it.
     if track.title.is_empty() && is_playing(session) {
+        proto::debug!("media", "properties ({why}): empty title while playing");
         return;
     }
     let track = (!track.title.is_empty()).then_some(track);
@@ -351,6 +389,8 @@ fn refresh_properties(shared: &Arc<Shared>, session: &Session, why: &str) {
         } else {
             set_cover(shared, None);
         }
+    } else if why != "timeline" {
+        proto::debug!("media", "properties ({why}): unchanged");
     }
     // The cover may arrive after the title (browsers: YouTube) as a separate properties event for the
     // same track; the same picture is filtered out by hash.
@@ -363,19 +403,25 @@ fn refresh_properties(shared: &Arc<Shared>, session: &Session, why: &str) {
 
 /// Reads the cover and accepts it if it is already the new track's picture.
 fn read_cover(shared: &Shared, props: &Properties) {
-    let Some(bytes) = read_thumbnail(props) else { return };
+    let Some(bytes) = read_thumbnail(props) else {
+        proto::debug!("media", "cover: no thumbnail");
+        return;
+    };
     let hash = fnv(&bytes);
     let Ok(mut c) = shared.cover.lock() else { return };
     // The same picture as the previous track's: the player has not swapped it yet; wait for the next.
     if hash == c.prev {
+        proto::debug!("media", "cover: still previous");
         return;
     }
     c.pending = false;
     if hash == c.hash {
+        proto::debug!("media", "cover: unchanged");
         return;
     }
     c.hash = hash;
     drop(c);
+    proto::debug!("media", "cover: updated, {} bytes", bytes.len());
     set_cover(shared, Some(bytes));
 }
 
@@ -399,16 +445,20 @@ fn retry_cover(shared: &Arc<Shared>, session: &Session, track: Option<Track>) {
             if !same || !pending || !is_current(&shared, &session) {
                 return;
             }
-            if let Ok(props) = session.TryGetMediaPropertiesAsync().and_then(|op| op.join()) {
-                read_cover(&shared, &props);
-                if !shared.cover.lock().map(|c| c.pending).unwrap_or(false) {
-                    (shared.notify)();
-                    return;
+            match session.TryGetMediaPropertiesAsync().and_then(|op| op.join()) {
+                Ok(props) => {
+                    read_cover(&shared, &props);
+                    if !shared.cover.lock().map(|c| c.pending).unwrap_or(false) {
+                        (shared.notify)();
+                        return;
+                    }
                 }
+                Err(e) => proto::warn!("media", "cover properties at {at} ms: {e}"),
             }
         }
         // It never changed: the track has the same cover (same album), so keep it; or there is none at
         // all, so drop the previous one.
+        proto::debug!("media", "cover: retries exhausted");
         if let Ok(mut c) = shared.cover.lock() {
             c.pending = false;
         }
@@ -429,15 +479,48 @@ fn fnv(bytes: &[u8]) -> u64 {
 }
 
 fn read_thumbnail(props: &Properties) -> Option<Vec<u8>> {
-    let stream = props.Thumbnail().ok()?.OpenReadAsync().ok()?.join().ok()?;
-    let size = stream.Size().ok()? as u32;
+    let stream = match props.Thumbnail() {
+        Ok(stream) => stream,
+        Err(e) => {
+            // No thumbnail is a valid state for a media session, not necessarily a failure.
+            proto::debug!("media", "thumbnail reference: {e}");
+            return None;
+        }
+    };
+    let stream = match stream.OpenReadAsync().and_then(|op| op.join()) {
+        Ok(stream) => stream,
+        Err(e) => {
+            proto::warn!("media", "thumbnail open: {e}");
+            return None;
+        }
+    };
+    let size = match stream.Size() {
+        Ok(size) => size as u32,
+        Err(e) => {
+            proto::warn!("media", "thumbnail size: {e}");
+            return None;
+        }
+    };
     if size == 0 {
+        proto::debug!("media", "thumbnail: empty stream");
         return None;
     }
-    let reader = DataReader::CreateDataReader(&stream).ok()?;
-    reader.LoadAsync(size).ok()?.join().ok()?;
+    let reader = match DataReader::CreateDataReader(&stream) {
+        Ok(reader) => reader,
+        Err(e) => {
+            proto::warn!("media", "thumbnail reader: {e}");
+            return None;
+        }
+    };
+    if let Err(e) = reader.LoadAsync(size).and_then(|op| op.join()) {
+        proto::warn!("media", "thumbnail load ({size} bytes): {e}");
+        return None;
+    }
     let mut buf = vec![0u8; size as usize];
-    reader.ReadBytes(&mut buf).ok()?;
+    if let Err(e) = reader.ReadBytes(&mut buf) {
+        proto::warn!("media", "thumbnail read ({size} bytes): {e}");
+        return None;
+    }
     Some(buf)
 }
 

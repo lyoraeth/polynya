@@ -54,7 +54,13 @@ impl PlayerPanel {
     fn sync_cover(&mut self, f: &Frame, m: &media::State) {
         if m.cover_rev != self.cover_rev {
             self.cover_rev = m.cover_rev;
-            self.cover = m.cover.as_ref().and_then(|b| f.gfx.decode(b).ok());
+            self.cover = m.cover.as_ref().and_then(|b| match f.gfx.decode(b) {
+                Ok(cover) => Some(cover),
+                Err(e) => {
+                    proto::warn!("media", "cover decode ({} bytes): {e}", b.len());
+                    None
+                }
+            });
             self.blurred = self.cover.as_ref().and_then(|c| f.gfx.blurred(c, COVER_BLUR, BLUR_SCALE).ok());
         }
     }

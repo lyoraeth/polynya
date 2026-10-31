@@ -9,7 +9,10 @@
 
 use std::{
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -318,14 +321,30 @@ pub enum Level {
 /// Maximum log file size before rotation to `polynya.old.log`.
 const LOG_MAX: u64 = 1 << 20;
 
+static DEBUG: OnceLock<AtomicBool> = OnceLock::new();
+
+fn debug_flag() -> &'static AtomicBool {
+    DEBUG.get_or_init(|| AtomicBool::new(config_value("log").as_deref() == Some("debug")))
+}
+
+/// Whether verbose logging is enabled in this process.
+pub fn log_debug() -> bool {
+    debug_flag().load(Ordering::Relaxed)
+}
+
+/// Changes verbose logging in this process without waiting for a restart.
+///
+/// The setting is persisted separately in `config.ini`; other processes read it on their first log.
+pub fn set_log_debug(enabled: bool) {
+    debug_flag().store(enabled, Ordering::Relaxed);
+}
+
 /// Appends a log entry to `polynya.log` in [`log_dir`].
 /// Rotates to `polynya.old.log` if size exceeds `LOG_MAX`.
 /// Uses append mode to ensure atomic line writes across concurrent threads/processes.
 pub fn log(level: Level, area: &str, msg: &str) {
     use std::io::Write;
-    static DEBUG: OnceLock<bool> = OnceLock::new();
-    let debug = *DEBUG.get_or_init(|| config_value("log").as_deref() == Some("debug"));
-    if level == Level::Debug && !debug {
+    if level == Level::Debug && !log_debug() {
         return;
     }
     let Some(dir) = log_dir() else { return };
@@ -443,6 +462,15 @@ pub fn language() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn log_debug_switches_without_restart() {
+        let previous = log_debug();
+        set_log_debug(!previous);
+        assert_eq!(log_debug(), !previous);
+        set_log_debug(previous);
+        assert_eq!(log_debug(), previous);
+    }
 
     #[test]
     fn portable_root_from_core_and_module() {
