@@ -211,8 +211,9 @@ Claude 的实现未能通过检验的部分，由我手动重写。
 
 ---
 
-## 许可证与商标
+## 许可证、第三方代码与商标
 
-* **Polynya 核心与内置模块**以 **[GNU GPLv3](LICENSE)** 发布，并附有第 7 条下的附加条款（在代码和“关于”窗口中保留署名、禁止把修改后的构建冒充为官方发行版、分支必须改名）。
-* **交互协议与 `proto` crate** 单独以 **[MIT](proto/LICENSE)** 许可证授权，第三方模块可以按任何条款分发。
-* **“Polynya”** 名称和标志归 Danil Klimov（`lyoraeth`）所有。可以做什么、不可以做什么，请见 **[TRADEMARKS.md](TRADEMARKS.md)**（仅有英文版，以英文版为准）。
+* **Polynya 核心与内置模块**在 **[GNU GPLv3](LICENSE)** 许可证及第 7 节附加条款下发布 (必须在代码和"关于"窗口中保留原作者信息, 禁止将修改后的构建版本标榜为官方发布, 且分支版本必须更改名称)。
+* **交互协议与 `proto` crate** 另以 **[MIT](proto/LICENSE)** 许可证单独授权, 因此第三方模块可以在任何条款下分发。
+* **第三方代码与借用的组件**受其原始许可证约束 (主要为 MIT 和 Apache-2.0)。完整的作者名单、借用组件说明及许可证全文已整理在 **[THIRD-PARTY.md](THIRD-PARTY.md)** 中。
+* **“Polynya”** 名称及 Logo 归 Danil Klimov（`lyoraeth`）所有。其使用规范详见 **[TRADEMARKS.md](TRADEMARKS.md)** (仅英文版本具有法律约束力)。

@@ -216,8 +216,9 @@ I'll be really grateful.
 
 ---
 
-## License and trademarks
+## License, third-party code, and trademarks
 
 * **The Polynya core and built-in modules** are released under **[GNU GPLv3](LICENSE)** with additional terms under Section 7 (keeping attribution in the code and the "About" window, a ban on passing off modified builds as an official release, and a mandatory rename for forks).
 * **The interaction protocol and the `proto` crate** are licensed separately under **[MIT](proto/LICENSE)**, so third-party modules can be distributed on any terms.
+* **Third-party code and borrowed components** remain subject to their original licenses (primarily MIT and Apache-2.0). The complete list of credits, borrowed components, and license texts is available in **[THIRD-PARTY.md](THIRD-PARTY.md)**.
 * The **"Polynya"** name and logo belong to Danil Klimov (`lyoraeth`). What you can and cannot do with them is described in **[TRADEMARKS.md](TRADEMARKS.md)**.
