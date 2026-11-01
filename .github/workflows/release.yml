@@ -54,6 +54,12 @@ jobs:
         with:
           pattern: bin-*
           path: bin
+      - name: Install Rust
+        shell: pwsh
+        run: ./.github/rust.ps1
+      - name: Install cargo-about
+        shell: pwsh
+        run: cargo install cargo-about --features cli --locked
       - name: Install Inno Setup
         shell: pwsh
         run: |

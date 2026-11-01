@@ -23,6 +23,8 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 # The shipped modules; `start` and `devtools` are not released yet (src/modules.rs, BUNDLED).
 $modules = 'agents', 'picker', 'notify'
 
+& (Join-Path $root 'tools\legal.ps1')
+
 $installer = & (Join-Path $root 'installer\build.ps1') -Arch $Arch -Bin $Bin | Select-Object -Last 1
 Copy-Item $installer $dist -Force
 
@@ -31,7 +33,8 @@ foreach ($kind in 'portable', 'modules') {
     $dir = Join-Path $stage $kind
     if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
     New-Item -ItemType Directory -Force $dir | Out-Null
-    Copy-Item (Join-Path $root 'LICENSE') (Join-Path $dir 'LICENSE.txt')
+    Copy-Item (Join-Path $root 'target\legal\LICENSE.txt') $dir
+    Copy-Item (Join-Path $root 'target\legal\NOTICE.txt') $dir
 }
 Copy-Item (Join-Path $binDir 'polynya.exe') (Join-Path $stage 'portable')
 New-Item -ItemType File (Join-Path $stage 'portable\portable') | Out-Null

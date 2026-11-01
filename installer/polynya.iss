@@ -58,6 +58,7 @@ SetupIconFile=..\assets\logo\polynya.ico
 UninstallDisplayIcon={app}\polynya.exe
 UninstallDisplayName=Polynya
 WizardStyle=modern
+LicenseFile=..\target\legal\LICENSE.txt
 Compression=lzma2/max
 SolidCompression=yes
 ; The island is closed by `polynya quit` (PrepareToInstall); this only catches what is left.
@@ -166,8 +167,9 @@ Name: "autostart"; Description: "{cm:Autostart}"; Check: IsFirstInstall
 
 [Files]
 Source: "{#Core}"; DestDir: "{app}"; Flags: ignoreversion
-; The GPL travels with the binaries.
-Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+; The GPL and third-party notices travel with the binaries.
+Source: "..\target\legal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\target\legal\NOTICE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Bin}\polynya-agents.exe"; DestDir: "{app}\modules\agents"; Components: modules\agents; Flags: ignoreversion
 Source: "..\modules\agents\module.toml"; DestDir: "{app}\modules\agents"; Components: modules\agents; Flags: ignoreversion
 Source: "{#Bin}\polynya-picker.exe"; DestDir: "{app}\modules\picker"; Components: modules\picker; Flags: ignoreversion

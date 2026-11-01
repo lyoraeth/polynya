@@ -1,0 +1,60 @@
+THIRD-PARTY NOTICES
+
+This file lists dependencies redistributed with Polynya. Components documented separately in THIRD-PARTY.md and Polynya's own crates are omitted.
+
+{{#each crates}}
+{{#unless (eq package.name "accesskit")}}
+{{#unless (eq package.name "arboard")}}
+{{#unless (eq package.name "polynya")}}
+{{#unless (eq package.name "proto")}}
+{{#unless (eq package.name "polynya-agents")}}
+{{#unless (eq package.name "polynya-notify")}}
+{{#unless (eq package.name "polynya-picker")}}
+{{#unless (eq package.name "polynya-start")}}
+{{package.name}} {{package.version}}
+{{#if package.repository}}{{{package.repository}}}{{else}}https://crates.io/crates/{{package.name}}{{/if}}
+License: {{license}}
+
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/each}}
+
+================================================================================
+LICENSE TEXTS
+================================================================================
+
+{{#each licenses}}
+{{name}}
+
+Used by:
+{{#each used_by}}
+{{#unless (eq crate.name "accesskit")}}
+{{#unless (eq crate.name "arboard")}}
+{{#unless (eq crate.name "polynya")}}
+{{#unless (eq crate.name "proto")}}
+{{#unless (eq crate.name "polynya-agents")}}
+{{#unless (eq crate.name "polynya-notify")}}
+{{#unless (eq crate.name "polynya-picker")}}
+{{#unless (eq crate.name "polynya-start")}}
+- {{crate.name}} {{crate.version}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/unless}}
+{{/each}}
+
+{{text}}
+
+================================================================================
+
+{{/each}}

@@ -37,6 +37,9 @@ $iscc = @(
 if (-not $iscc) { throw 'Inno Setup 6 (ISCC.exe) not found' }
 
 $binDir = (Resolve-Path $(if ([IO.Path]::IsPathRooted($Bin)) { $Bin } else { Join-Path $root $Bin })).Path
+if (-not (Test-Path (Join-Path $root 'target\legal\LICENSE.txt')) -or -not (Test-Path (Join-Path $root 'target\legal\NOTICE.txt'))) {
+    & (Join-Path $root 'tools\legal.ps1')
+}
 & $iscc /Q "/DArch=$Arch" "/DBin=$binDir" "/DEverything=$setup" (Join-Path $PSScriptRoot 'polynya.iss')
 if ($LASTEXITCODE -ne 0) { throw "ISCC: $LASTEXITCODE" }
 Get-ChildItem (Join-Path $root 'target\installer') -Filter "*-$Arch-setup.exe" | Sort-Object LastWriteTime | Select-Object -Last 1 | ForEach-Object FullName
