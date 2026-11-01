@@ -432,11 +432,17 @@ impl MenuPanel {
         }
     }
 
-    pub fn moving(&self) -> bool {
+    /// Short input-driven animations follow the monitor's refresh rate.
+    pub fn interactive(&self) -> bool {
         let switching = self.screen().is_some_and(|s| {
             s.rows.iter().any(|r| matches!(r, Row::Toggle { id, on, .. } if self.switches.get(id).is_some_and(|p| *p != if *on { 1.0 } else { 0.0 })))
         });
-        self.slide > 0.0 || self.confirm.is_some() || self.glide.moving() || switching
+        self.slide > 0.0 || self.glide.moving() || switching
+    }
+
+    /// The timed confirmation bar also needs frames, but stays on the background cadence.
+    pub fn moving(&self) -> bool {
+        self.interactive() || self.confirm.is_some()
     }
 
     fn has_title(&self) -> bool {

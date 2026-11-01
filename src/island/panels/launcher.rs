@@ -128,7 +128,8 @@ impl LauncherPanel {
         }
     }
 
-    pub fn moving(&self) -> bool {
+    /// Scrolling, menu expansion and selection follow the monitor's refresh rate.
+    pub fn interactive(&self) -> bool {
         let target = if self.model.menu.is_some() { 1.0 } else { 0.0 };
         (self.scroll - self.scroll_to).abs() > 0.3 || self.menu_p != target || self.last_t.is_none() || self.glide.moving()
     }

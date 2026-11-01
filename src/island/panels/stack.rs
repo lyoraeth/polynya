@@ -43,8 +43,8 @@ impl StackPanel {
         self.notes.len()
     }
 
-    /// Highlight plate is still animating, requiring frames.
-    pub fn moving(&self) -> bool {
+    /// Highlight plate follows the monitor's refresh rate while moving between rows.
+    pub fn interactive(&self) -> bool {
         self.glide.moving()
     }
 }

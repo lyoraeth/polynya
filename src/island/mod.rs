@@ -987,7 +987,10 @@ impl Island {
         moving |= self.sync_launcher();
 
         let content = self.shown.is_some() && self.t - self.phase_at < CONTENT_START + CONTENT_DUR + CONTENT_STAGGER * STAGGER_ROWS as f32;
-        a | b | c | content | self.pending.is_some() | hover_waiting | moving
+        let interactive = (self.launcher_open() && self.launcher.interactive())
+            || (self.menu_open() && self.menu.interactive())
+            || (self.open == Some(Panel::Stack) && self.stack_panel.interactive());
+        a | b | c | content | self.pending.is_some() | hover_waiting | moving | interactive
     }
 
     pub fn needs_ticks(&self) -> bool {
@@ -997,9 +1000,9 @@ impl Island {
 
     pub fn wants_frames(&self) -> bool {
         let logo = self.zone.shows(logo::Anim::Dots);
-        let launcher = (self.launcher_open() && self.launcher.moving())
+        let launcher = (self.launcher_open() && self.launcher.interactive())
             || (self.menu_open() && self.menu.moving())
-            || (self.open == Some(Panel::Stack) && self.stack_panel.moving());
+            || (self.open == Some(Panel::Stack) && self.stack_panel.interactive());
         self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || logo || launcher || self.text_running
     }
 
