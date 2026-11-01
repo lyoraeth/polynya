@@ -194,24 +194,17 @@ polynya modules reload
 
 ---
 
-## 開発の方法
+## 開発プロセスについて
 
-このプロジェクトの開発には生成 AI を使用しています。
-Polynya は [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering) の手法で作られています。
-コードとドキュメントは [Claude Code](https://claude.com/claude-code)（Anthropic）と一緒に書いています。
-アイデア、プロダクトとインターフェースの判断、アーキテクチャの選択、ビジュアルデザインは私が担当し、
-実装は私の指示のもとで Claude が書いています。こうした判断をこの種のプロダクトに必要なレベルで行うために、
-Rust のドキュメント、Windows の開発者フォーラム、同じジャンルの他プロジェクトのソースコードを自分で読み込み、
-Claude の実装が検証に耐えなかった部分は手で書き直しました。
+本プロジェクトの開発には生成 AI を活用しています。
+Polynya は [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering) アプローチを採用して開発されました。
+初期のコードおよびドキュメントは [Claude Code](https://claude.com/claude-code)（Anthropic）との共同作業で最初の安定版リリースまで到達しました。しかし、地域制限の強化と機械的なアカウント停止措置により開発フローの変更を余儀なくされました。その後のプロジェクトの継続開発、新機能モジュールの実装、およびリファクタリングは、手動または Kimi モデル（Moonshot AI）のサポートを受けて進めています。
 
-すべての変更は、プロジェクトに入る前に実際の Windows 11 タスクバーで動作を確認しています。
-さらにリリースのたびに、ローカルでテストを行い境界ケースを確認しています。
-想定外の動作に遭遇した場合は、[issues](https://github.com/lyoraeth/polynya/issues) または個別のメッセージ（連絡先は上記）で内容をお知らせのうえ、
-ログ（`%LOCALAPPDATA%\Polynya\logs\polynya.log`）を添付してください。
+コンセプト、製品・UI 仕様の策定、アーキテクチャの選定、およびビジュアルデザインはすべて私自身によるものです。LLM の出力を適切に制御し、システムソフトウェアとして要求される品質基準を担保するため、Rust 公式ドキュメント、Win32 API / COM、DirectComposition の内部構造、および関連プロジェクトのソースコードを精査しました。ハルシネーションや、性能・安全性のテストをクリアできなかったコードは手作業で全面的に書き直しています。
 
-私はすべてを知っているわけではありませんが、より良くなろうと努め、学ぶことを楽しんでいます。
-アーキテクチャや構文の誤り、コード内の潜在的に危険な箇所を見つけたら、[issues](https://github.com/lyoraeth/polynya/issues) または
-[ディスカッション](https://github.com/lyoraeth/polynya/discussions) に、どこが問題か、なぜ良くないか、どうすればより良くなるかを書いていただけると、とてもありがたいです。
+すべての変更はマージ前に実際の Windows 11 タスクバー上で動作確認を行い、各リリース前にはローカル環境でのテストとエッジケースの検証を実施しています。予期せぬ動作が発生した場合は、[issues](https://github.com/lyoraeth/polynya/issues) またはダイレクトメッセージ（上記の連絡先）にて、ログファイル（`%LOCALAPPDATA%\Polynya\logs\polynya.log`）を添付の上ご報告ください。
+
+至らない点も多々ありますが、常に改善に努め、謙虚に学び続けたいと考えています。設計上の問題、構文エラー、または潜在的に危険なコード箇所を発見された場合は、ぜひ [issues](https://github.com/lyoraeth/polynya/issues) や [ディスカッション](https://github.com/lyoraeth/polynya/discussions) にて「どこに問題があり、なぜ不適切で、どう改善すべきか」をご指摘いただけますと幸いです。
 
 ---
 

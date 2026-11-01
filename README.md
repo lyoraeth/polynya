@@ -194,25 +194,17 @@ polynya modules reload
 
 ---
 
-## How it's made
+## How It Was Made
 
-Generative AI was used to build this project.
-Polynya is made through [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering):
-I write the code and documentation together with [Claude Code](https://claude.com/claude-code) (Anthropic).
-The idea, product and interface decisions, the architecture choices and the visual design are mine;
-Claude writes the implementation under my direction. To make those decisions at the level a product
-like this needs, I worked through the Rust documentation, the Windows developer forums and the source
-code of other projects in a similar niche myself, and rewrote by hand the parts of the code where
-Claude's version didn't hold up.
+Generative AI was used in the development of this project.
+Polynya was developed using the [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering) approach.
+Initially, the code and documentation were brought to the first stable releases in tandem with [Claude Code](https://claude.com/claude-code) (Anthropic). However, regional restrictions and automated ban hammers forced adjustments to the development pipeline. Further project development, new modules, and refactoring are now conducted either entirely by hand or with the assistance of Kimi models (Moonshot AI).
 
-Every change is tested live on a real Windows 11 taskbar before it gets into the project, and before
-each release the tests and edge cases are checked locally. If you run into unexpected behavior, please
-describe it in [issues](https://github.com/lyoraeth/polynya/issues) or in a private message (contacts above) and attach the log (`%LOCALAPPDATA%\Polynya\logs\polynya.log`).
+The core concept, product and interface decisions, architectural choices, and visual design are entirely mine. To maintain strict oversight over LLMs and make decisions appropriate for low-level system software, I studied the Rust documentation, Win32 API / COM, DirectComposition internals, and source code of related projects. Hallucinations and code snippets failing performance or safety benchmarks were rewritten manually.
 
-I don't know everything, but I try to get better and I'm glad to learn. If you find an architectural
-or code-level mistake, or a potentially dangerous spot in the code, please write in [issues](https://github.com/lyoraeth/polynya/issues)
-or [discussions](https://github.com/lyoraeth/polynya/discussions): where the problem is, why it's bad and how to do it better.
-I'll be really grateful.
+Every change is verified live on an actual Windows 11 taskbar before entering the repository, and local tests alongside edge-case validations are performed prior to each release. If you encounter unexpected behavior, please submit an issue on [issues](https://github.com/lyoraeth/polynya/issues) or reach out via direct message (contacts above) with the attached log file (`%LOCALAPPDATA%\Polynya\logs\polynya.log`).
+
+I don't claim to know everything, but I am committed to improving and always happy to learn. If you spot an architectural flaw, syntax issue, or potentially unsafe code path, please submit an [issue](https://github.com/lyoraeth/polynya/issues) or start a [discussion](https://github.com/lyoraeth/polynya/discussions): specify the problem, explain why it falls short, and suggest a better approach. Feedback is deeply appreciated.
 
 ---
 

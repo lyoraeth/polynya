@@ -197,17 +197,14 @@ polynya modules reload
 ## 开发方式
 
 本项目在开发中使用了生成式 AI。
-Polynya 采用 [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering) 的方式开发：
-代码和文档由我与 [Claude Code](https://claude.com/claude-code)（Anthropic）共同编写。
-创意、产品与界面决策、架构选择和视觉设计由我负责，Claude 按照我的指示编写实现。
-为了让这些决策达到此类产品所需的水平，我亲自研读了 Rust 文档、Windows 开发者论坛以及同类项目的源代码；
-Claude 的实现未能通过检验的部分，由我手动重写。
+Polynya 采用 [agentic engineering](https://simonwillison.net/2026/may/6/vibe-coding-and-agentic-engineering) 的方式开发。
+最初的代码与文档是由我与 [Claude Code](https://claude.com/claude-code)（Anthropic）共同推进至首批稳定版本的。然而，区域限制机制和自动封号策略打乱了既有的开发流程。项目的后续演进、新模块编写以及代码重构，目前均由我手动完成或在 Kimi 模型（Moonshot AI）的协助下进行。
 
-每一处改动在进入项目之前，都会在真实的 Windows 11 任务栏上实际验证；每次发布前还会在本地进行测试并检查边界情况。
-如果遇到异常行为，请在 [issues](https://github.com/lyoraeth/polynya/issues) 或通过私信（联系方式见上方）描述问题，并附上日志（`%LOCALAPPDATA%\Polynya\logs\polynya.log`）。
+创意、产品与界面决策、架构选择和视觉设计完全由我把控。为了有效约束大语言模型并做出符合底层系统软件标准的决策，我亲自研读了 Rust 文档、Win32 API / COM 体系、DirectComposition 底层机制以及同类项目的源码。凡是出现幻觉或未通过性能与安全性基准测试的代码，均由我手动重写。
 
-我并非无所不知，但我在努力变得更好，也乐于学习。如果你发现了架构或语法上的错误，或代码中潜在的危险之处，
-请在 [issues](https://github.com/lyoraeth/polynya/issues) 或 [讨论区](https://github.com/lyoraeth/polynya/discussions) 留言：问题在哪里、为什么不好、怎样做更好。非常感谢。
+每一处改动在合入项目之前，都会在真实的 Windows 11 任务栏上进行实机验证；每次发布前还会在本地进行测试并覆盖边界情况。如果遇到异常行为，请在 [issues](https://github.com/lyoraeth/polynya/issues) 或通过私信（联系方式见上方）反馈，并附上日志文件（`%LOCALAPPDATA%\Polynya\logs\polynya.log`）。
+
+我并非无所不知，但我始终乐于学习并不断精进。如果你发现了架构缺陷、语法错误或潜在的代码安全隐患，请在 [issues](https://github.com/lyoraeth/polynya/issues) 或 [讨论区](https://github.com/lyoraeth/polynya/discussions) 留言指出：问题出在哪里、为什么不好以及如何改进。非常感谢。
 
 ---
 
