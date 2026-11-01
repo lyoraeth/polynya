@@ -103,6 +103,7 @@ fn hot_id(k: HotKind) -> u64 {
         HotKind::MenuRow(i) => 1200 + i as u64,
         HotKind::MenuBack => 1300,
         HotKind::Swatch(i) => 1400 + i as u64,
+        HotKind::ImagePreview(i) => 1450 + i as u64,
         HotKind::Media(Cmd::Prev) => 1500,
         HotKind::Media(Cmd::TogglePlay) => 1501,
         HotKind::Media(Cmd::Next) => 1502,
@@ -134,6 +135,7 @@ impl Island {
                 HotKind::Dismiss => n.close,
                 HotKind::MenuBack => n.back,
                 HotKind::Swatch(_) => n.copy_color,
+                HotKind::ImagePreview(_) => n.open_image,
                 _ => return None,
             }
             .to_string(),
@@ -235,10 +237,15 @@ impl Island {
             let kind = HotKind::MenuRow(i);
             let rect = self.hot_rect(kind);
             let e = match row {
-                Row::Item { text, hint, keys, confirm, .. } => {
+                Row::Item { text, hint, keys, confirm, image, .. } => {
                     let mut e = element(hot_id(kind), PANEL, Role::Button, text.clone(), rect);
                     e.description =
                         confirm.clone().unwrap_or_else(|| [keys, hint].into_iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(", "));
+                    if let Some(image) = image.as_ref().filter(|image| image.preview) {
+                        out.push(e);
+                        out.push(element(hot_id(HotKind::ImagePreview(i)), PANEL, Role::Button, image.alt.clone(), self.hot_rect(HotKind::ImagePreview(i))));
+                        continue;
+                    }
                     e
                 }
                 Row::Toggle { text, on, .. } => {
@@ -256,11 +263,20 @@ impl Island {
                 Row::Section { title } if !title.is_empty() => element(hot_id(kind), PANEL, Role::Label, title.clone(), None),
                 Row::Header { title, subtitle } => element(hot_id(kind), PANEL, Role::Label, format!("{title}, {subtitle}"), None),
                 Row::Pair { label, value } => element(hot_id(kind), PANEL, Role::Label, format!("{label}: {value}"), None),
+                Row::Image { image, caption } => {
+                    let kind = if image.preview { HotKind::ImagePreview(i) } else { kind };
+                    let role = if image.preview { Role::Button } else { Role::Label };
+                    let name = if image.alt.is_empty() { caption.clone() } else { image.alt.clone() };
+                    element(hot_id(kind), PANEL, role, name, self.hot_rect(kind))
+                }
                 Row::Section { .. } | Row::Divider | Row::Art { .. } => continue,
             };
             out.push(e);
         }
-        Some(sel.map_or(PANEL, |i| hot_id(HotKind::MenuRow(i))))
+        Some(sel.map_or(PANEL, |i| match screen.rows.get(i) {
+            Some(Row::Image { image, .. }) if image.preview => hot_id(HotKind::ImagePreview(i)),
+            _ => hot_id(HotKind::MenuRow(i)),
+        }))
     }
 
     /// The control under the cursor that has a tooltip: an icon button or the search block.

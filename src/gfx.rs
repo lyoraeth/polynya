@@ -380,6 +380,18 @@ impl Gfx {
         }
     }
 
+    /// Creates a bitmap from premultiplied BGRA pixels prepared by a background decoder.
+    pub fn bitmap_bgra(&self, width: u32, height: u32, pixels: &[u8]) -> Result<ID2D1Bitmap1> {
+        let props = D2D1_BITMAP_PROPERTIES1 {
+            pixelFormat: D2D1_PIXEL_FORMAT { format: DXGI_FORMAT_B8G8R8A8_UNORM, alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED },
+            dpiX: self.dpi,
+            dpiY: self.dpi,
+            ..Default::default()
+        };
+        // SAFETY: D2D copies the pixels during this call; the slice has `width * height * 4` bytes.
+        unsafe { self.dc.CreateBitmap(D2D_SIZE_U { width, height }, Some(pixels.as_ptr().cast()), width * 4, &props) }
+    }
+
     pub fn decode(&self, bytes: &[u8]) -> Result<ID2D1Bitmap1> {
         // SAFETY: the WIC stream reads `bytes` in place, and every WIC object is dropped before return,
         // so `bytes` outlives them all.

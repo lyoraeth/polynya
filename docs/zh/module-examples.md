@@ -2,7 +2,7 @@
 
 [English](../module-examples.md) · [Русский](../ru/module-examples.md) · **简体中文** · [日本語](../ja/module-examples.md)
 
-四个完整的模块，从最小的开始。每个都只有一个文件，不需要任何包：把文件夹复制到 `%LOCALAPPDATA%\Polynya\modules\`（便携版复制到 `polynya.exe` 旁边的 `modules\`），然后打开搜索即可。所有字段的说明见 **[模块 API](module-api.md)**。
+五个完整的模块，从最小的开始。每个都只有一个文件，不需要任何包：把文件夹复制到 `%LOCALAPPDATA%\Polynya\modules\`（便携版复制到 `polynya.exe` 旁边的 `modules\`），然后打开搜索即可。所有字段的说明见 **[模块 API](module-api.md)**。
 
 ---
 
@@ -203,6 +203,52 @@ chip(key="backup", title="Backup finished", icon="ok", ttl_ms=5000)
 ```
 
 一次连接只传一条消息。如果“岛”没有运行，打开管道会立即失败。
+
+---
+
+## 5. 图片（Node.js）
+
+这个模块显示 PNG 缩略图、通过 Base64 提供的全宽 SVG，以及带有相同缩略图的通知。请把路径替换为你自己的文件。
+
+`modules\imagedemo\module.toml`:
+```toml
+api = 2
+id = "imagedemo"
+exe = "main.js"
+
+name.en = "Image demo"
+
+[main]
+hint.en = "A thumbnail, a full-width image and a chip"
+```
+
+`modules\imagedemo\main.js`:
+```js
+const fs = require('node:fs');
+const readline = require('node:readline');
+
+const png = 'C:/images/chart.png';
+const svg = 'C:/images/chart.svg';
+const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
+
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.op !== 'invoke' || msg.command !== 'main') return;
+
+  send({ op: 'open', screen: { title: 'Images', rows: [
+    { type: 'item', id: 'chart', text: 'Open chart', image: { path: png, alt: 'Weekly load', preview: true } },
+    { type: 'image', caption: 'Weekly load', image: {
+      data: fs.readFileSync(svg).toString('base64'),
+      mime: 'image/svg+xml', alt: 'Weekly load', preview: true,
+    } },
+  ] } });
+  send({ op: 'chip', key: 'image-demo', title: 'Chart ready', body: 'PNG thumbnail in the expanded notification',
+    image: { path: png, alt: 'Weekly load', preview: true } });
+  send({ op: 'close' });
+});
+```
+
+行操作保持不变。启用 `preview` 后，点击图片本身会打开系统查看器。`alt` 供屏幕阅读器使用，也会在加载期间或解码失败时显示。
 
 ---
 

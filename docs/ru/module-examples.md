@@ -2,7 +2,7 @@
 
 [English](../module-examples.md) · **Русский** · [简体中文](../zh/module-examples.md) · [日本語](../ja/module-examples.md)
 
-Четыре готовых модуля, от самого маленького. Каждый умещается в один файл и не требует пакетов: скопируйте папку в `%LOCALAPPDATA%\Polynya\modules\` (в портативной версии - в `modules\` рядом с `polynya.exe`) и откройте поиск. Все поля описаны в **[API модулей](module-api.md)**.
+Пять готовых модулей, от самого маленького. Каждый умещается в один файл и не требует пакетов: скопируйте папку в `%LOCALAPPDATA%\Polynya\modules\` (в портативной версии - в `modules\` рядом с `polynya.exe`) и откройте поиск. Все поля описаны в **[API модулей](module-api.md)**.
 
 ---
 
@@ -203,6 +203,52 @@ chip(key="backup", title="Backup finished", icon="ok", ttl_ms=5000)
 ```
 
 Одно подключение - одно сообщение. Если остров не запущен, открыть канал не получится сразу же.
+
+---
+
+## 5. Изображения (Node.js)
+
+Этот модуль показывает PNG-миниатюру, полноширинный SVG из Base64 и уведомление с той же миниатюрой. Замените пути на свои файлы.
+
+`modules\imagedemo\module.toml`:
+```toml
+api = 2
+id = "imagedemo"
+exe = "main.js"
+
+name.en = "Image demo"
+
+[main]
+hint.en = "A thumbnail, a full-width image and a chip"
+```
+
+`modules\imagedemo\main.js`:
+```js
+const fs = require('node:fs');
+const readline = require('node:readline');
+
+const png = 'C:/images/chart.png';
+const svg = 'C:/images/chart.svg';
+const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
+
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.op !== 'invoke' || msg.command !== 'main') return;
+
+  send({ op: 'open', screen: { title: 'Images', rows: [
+    { type: 'item', id: 'chart', text: 'Open chart', image: { path: png, alt: 'Weekly load', preview: true } },
+    { type: 'image', caption: 'Weekly load', image: {
+      data: fs.readFileSync(svg).toString('base64'),
+      mime: 'image/svg+xml', alt: 'Weekly load', preview: true,
+    } },
+  ] } });
+  send({ op: 'chip', key: 'image-demo', title: 'Chart ready', body: 'PNG thumbnail in the expanded notification',
+    image: { path: png, alt: 'Weekly load', preview: true } });
+  send({ op: 'close' });
+});
+```
+
+Строка сохраняет своё действие. Клик по самому изображению открывает системный просмотрщик, потому что включён `preview`. `alt` читается скринридером и показывается во время загрузки или при ошибке декодирования.
 
 ---
 

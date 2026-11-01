@@ -2,7 +2,7 @@
 
 [English](../module-examples.md) · [Русский](../ru/module-examples.md) · [简体中文](../zh/module-examples.md) · **日本語**
 
-小さいものから順に、完成したモジュールを 4 つ紹介します。どれも 1 ファイルで完結し、パッケージは不要です。フォルダーを `%LOCALAPPDATA%\Polynya\modules\`（ポータブル版では `polynya.exe` の隣の `modules\`）にコピーして検索を開くだけで動きます。各フィールドの説明は **[モジュール API](module-api.md)** にあります。
+小さいものから順に、完成したモジュールを 5 つ紹介します。どれも 1 ファイルで完結し、パッケージは不要です。フォルダーを `%LOCALAPPDATA%\Polynya\modules\`（ポータブル版では `polynya.exe` の隣の `modules\`）にコピーして検索を開くだけで動きます。各フィールドの説明は **[モジュール API](module-api.md)** にあります。
 
 ---
 
@@ -203,6 +203,52 @@ chip(key="backup", title="Backup finished", icon="ok", ttl_ms=5000)
 ```
 
 1 回の接続で送れるメッセージは 1 つです。アイランドが起動していなければ、パイプを開く時点ですぐに失敗します。
+
+---
+
+## 5. 画像（Node.js）
+
+PNG のサムネイル、Base64 からの全幅 SVG、そして同じサムネイルを含む通知を表示するモジュールです。パスは自分のファイルに置き換えてください。
+
+`modules\imagedemo\module.toml`:
+```toml
+api = 2
+id = "imagedemo"
+exe = "main.js"
+
+name.en = "Image demo"
+
+[main]
+hint.en = "A thumbnail, a full-width image and a chip"
+```
+
+`modules\imagedemo\main.js`:
+```js
+const fs = require('node:fs');
+const readline = require('node:readline');
+
+const png = 'C:/images/chart.png';
+const svg = 'C:/images/chart.svg';
+const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
+
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.op !== 'invoke' || msg.command !== 'main') return;
+
+  send({ op: 'open', screen: { title: 'Images', rows: [
+    { type: 'item', id: 'chart', text: 'Open chart', image: { path: png, alt: 'Weekly load', preview: true } },
+    { type: 'image', caption: 'Weekly load', image: {
+      data: fs.readFileSync(svg).toString('base64'),
+      mime: 'image/svg+xml', alt: 'Weekly load', preview: true,
+    } },
+  ] } });
+  send({ op: 'chip', key: 'image-demo', title: 'Chart ready', body: 'PNG thumbnail in the expanded notification',
+    image: { path: png, alt: 'Weekly load', preview: true } });
+  send({ op: 'close' });
+});
+```
+
+行の動作はそのままです。`preview` を有効にしているため、画像自体をクリックするとシステムのビューアーで開きます。`alt` はスクリーン リーダーで読み上げられ、読み込み中やデコード失敗時にも表示されます。
 
 ---
 

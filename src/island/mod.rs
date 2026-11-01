@@ -9,6 +9,7 @@
 
 mod access;
 mod field;
+pub mod image;
 pub mod kit;
 mod logo;
 mod panels;
@@ -87,6 +88,7 @@ pub enum Action {
     LaunchAct(usize),
     Swatch(usize),
     OpenApp(Part),
+    ImagePreview(usize),
     MenuRow(usize),
     MenuBack,
     Close,
@@ -654,10 +656,25 @@ impl Island {
         self.menu.activate(i)
     }
 
+    pub fn menu_image(&self, i: usize) -> Option<proto::ImageRef> {
+        let (screen, _) = self.menu.current()?;
+        match screen.rows.get(i)? {
+            proto::Row::Item { image: Some(image), .. } | proto::Row::Image { image, .. } if image.preview => Some(image.clone()),
+            _ => None,
+        }
+    }
+
     pub fn menu_back(&mut self) -> MenuEffect {
         let e = self.menu.back();
         self.fit(Panel::Menu);
         e
+    }
+
+    /// Recalculates panel height after asynchronous content, such as an image, becomes ready.
+    pub fn reflow(&mut self) {
+        if let Some(panel) = self.open {
+            self.fit(panel);
+        }
     }
 
     fn fit(&mut self, panel: Panel) {
@@ -826,6 +843,10 @@ impl Island {
 
     pub fn note_app(&self, part: Part) -> Option<String> {
         self.zone.note(part)?.app.clone()
+    }
+
+    pub fn note_image(&self) -> Option<proto::ImageRef> {
+        self.zone.note(self.open_part?)?.image.clone().filter(|image| image.preview)
     }
 
     pub fn dismiss_note(&mut self, part: Part) {
@@ -1048,6 +1069,11 @@ impl Island {
         if self.open.is_none() {
             return;
         }
+        match self.open {
+            Some(Panel::Menu) => self.menu.clear_images(),
+            Some(Panel::Note) => self.note_panel.clear_image(),
+            _ => {}
+        }
         self.open = None;
         self.phase_at = self.t;
         let (cx, w) = self.anchor;
@@ -1068,6 +1094,7 @@ impl Island {
                 HotKind::LaunchAct(j) => Action::LaunchAct(j),
                 HotKind::Swatch(i) => Action::Swatch(i),
                 HotKind::OpenApp => self.open_part.map_or(Action::None, Action::OpenApp),
+                HotKind::ImagePreview(i) => Action::ImagePreview(i),
                 HotKind::MenuRow(i) => Action::MenuRow(i),
                 HotKind::MenuBack => Action::MenuBack,
                 HotKind::Seek { duration } => {

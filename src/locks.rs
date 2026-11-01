@@ -104,6 +104,7 @@ fn note(i: usize, on: bool) -> Note {
         key: key.into(),
         source: None,
         app: None,
+        image: None,
         popup: false,
         icon: Icon::Key,
         title: if on { name.into() } else { format!("{name} {}", tr.lock_short_off) },

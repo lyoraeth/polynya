@@ -35,6 +35,7 @@ AppSupportURL=https://github.com/lyoraeth/polynya/issues
 AppUpdatesURL=https://github.com/lyoraeth/polynya/releases
 VersionInfoVersion={#GetVersionNumbersString(Core)}
 DefaultDirName={localappdata}\Polynya
+DefaultGroupName=Polynya
 DisableDirPage=yes
 DisableWelcomePage=no
 DisableProgramGroupPage=yes
@@ -182,7 +183,13 @@ Source: "{#Everything}"; DestDir: "{tmp}"; DestName: "everything-setup.exe"; Com
 ; The same value the tray toggle writes (src/autostart.rs), so the toggle shows it as on.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Polynya"; ValueData: """{app}\polynya.exe"""; Tasks: autostart
 
+[Icons]
+; Registers Polynya in Start Menu search and in shell:AppsFolder for our own launcher.
+Name: "{group}\Polynya"; Filename: "{app}\polynya.exe"; WorkingDir: "{app}"
+
 [UninstallDelete]
+Type: files; Name: "{group}\Polynya.lnk"
+Type: dirifempty; Name: "{group}"
 ; Exes set aside while they were running during an update.
 Type: files; Name: "{app}\*.old"
 Type: files; Name: "{app}\modules\*\*.old"

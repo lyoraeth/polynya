@@ -99,7 +99,15 @@ pub fn strings() -> &'static Strings {
 }
 
 fn item(id: &str, text: &str, keys: &str, confirm: Option<&str>) -> Row {
-    Row::Item { id: id.into(), text: text.into(), hint: String::new(), keys: keys.into(), command: String::new(), confirm: confirm.map(String::from) }
+    Row::Item {
+        id: id.into(),
+        text: text.into(),
+        hint: String::new(),
+        keys: keys.into(),
+        command: String::new(),
+        confirm: confirm.map(String::from),
+        image: None,
+    }
 }
 
 pub fn main_screen() -> Screen {

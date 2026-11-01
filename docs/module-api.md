@@ -164,7 +164,8 @@ Each message is **one line of JSON** ending with `\n`, encoded in UTF-8. The `op
 
 | `type` | Fields | What it is |
 | :--- | :--- | :--- |
-| `item` | `id`, `text`, `hint?`, `command?`, `keys?`, `confirm?` | A selectable row; `hint` is muted on the right. `command` makes the row a function of the module: the core shows the function's hotkey in a narrow column and sends `invoke` with `"source": "menu"` instead of `select`. `keys` is a shortcut to show that is not the module's own (e.g. `Win+L`). With `confirm` (e.g. `"Restart now?"`), the first press shows that question with a shrinking bar, and only a second press within 3 seconds acts. |
+| `item` | `id`, `text`, `hint?`, `command?`, `keys?`, `confirm?`, `image?` | A selectable row; `hint` is muted on the right. `command` makes the row a function of the module: the core shows the function's hotkey in a narrow column and sends `invoke` with `"source": "menu"` instead of `select`. `keys` is a shortcut to show that is not the module's own (e.g. `Win+L`). With `confirm` (e.g. `"Restart now?"`), the first press shows that question with a shrinking bar, and only a second press within 3 seconds acts. `image` adds a 56×56 DIP thumbnail on the left; the row keeps its normal action, while a click on the thumbnail opens the preview when enabled. |
+| `image` | `image`, `caption?` | An image fitted to the panel width, preserving aspect ratio, with an optional caption below. The height is capped at 360 DIP; extremely tall images are contained without cropping. |
 | `toggle` | `id`, `text`, `on` | A row with a switch. A press sends `select`, and the module answers with `update` and the new `on`. |
 | `input` | `id`, `text`, `placeholder?` | A text field. A press starts editing with the caret under the cursor; a drag selects, a double click selects a word, long text scrolls, and the clipboard, `Ctrl+Z` and IME work. Enter sends `submit`, Esc cancels. `text` is the current value. |
 | `button` | `id`, `text`, `plain?` | A full-width button. `plain: true` draws it without a background. |
@@ -179,9 +180,36 @@ Long text in any row is trimmed to fit, and the selected row scrolls it as a mar
 
 ---
 
-## 6. Chips
+## 6. Images (API 2)
 
-A chip is a notification in the right zone of the taskbar. A module writes it to its `stdout`. Any other program sends it to the named pipe `\\.\pipe\Polynya-<SessionId>`, one JSON message of up to 64 KB per connection, or with `polynya push` from the command line.
+Use an `ImageRef` in an `item`, an `image` row or a chip. It has exactly one source: `path` or `data`.
+
+```json
+{"path": "C:/images/chart.png", "alt": "Weekly load", "preview": true, "width": 1200, "height": 600}
+```
+
+```json
+{"data": "iVBORw0KGgoAAA...", "mime": "image/png", "alt": "Weekly load", "preview": true}
+```
+
+| Field | Default | Description |
+| :--- | :--- | :--- |
+| `path` | `null` | Absolute path to an image file. Relative paths and URLs are not accepted. |
+| `data` | `null` | Base64-encoded image bytes. Required alternative to `path`; do not pass both. |
+| `mime` | `null` | Required for `data`: `image/png`, `image/jpeg`, `image/svg+xml`, `image/gif`, `image/bmp`, `image/x-icon`, `image/tiff` or `image/webp`. |
+| `alt` | `""` | Accessibility text and the placeholder while loading or after a decoding error. |
+| `preview` | `false` | Opens the original image in the Windows default app for its format when the user clicks it. Embedded data is written to a temporary file first. |
+| `width`, `height` | `null` | Optional dimensions of the original, used to reserve the aspect ratio before decoding. |
+
+Raster formats are decoded through Windows Imaging Component (WIC). SVG is rendered with `resvg`; externally linked resources are ignored. Text in SVG can use installed fonts and CJK fallbacks; the system font catalog is loaded only when an SVG contains text. Decoding happens in the background and is cached, never repeated per frame. A full-width image is contained within 360 DIP of height, while a thumbnail is center-cropped to 56×56 DIP.
+
+Limits: **16 MiB per pipe message**, **12 MiB per source image**, and **16 megapixels**. Unsupported formats, invalid Base64, missing files and oversized images produce a placeholder and a log warning.
+
+---
+
+## 7. Chips
+
+A chip is a notification in the right zone of the taskbar. A module writes it to its `stdout`. Any other program sends it to the named pipe `\\.\pipe\Polynya-<SessionId>`, one JSON message of up to 16 MiB per connection, or with `polynya push` from the command line.
 
 ```json
 {"op": "chip", "key": "build", "title": "Build finished", "body": "48 s", "icon": "ok", "ttl_ms": 5000}
@@ -198,6 +226,7 @@ A chip is a notification in the right zone of the taskbar. A module writes it to
 | `animated` | `false` | An animated icon: the work is in progress. |
 | `source` | `key` | A series: chips from one source don't wait for each other in the queue. |
 | `popup` | `false` | Expand the chip as a compact dropdown when it gets first place. |
+| `image` | `null` | An `ImageRef` shown as a 56×56 DIP thumbnail in the expanded notification. |
 | `swatches` | `[]` | `#rrggbb` colors drawn in the expanded chip; a click copies one. |
 | `mark` | `null` | Index of the highlighted color in `swatches`. |
 
@@ -205,7 +234,7 @@ A chip is a notification in the right zone of the taskbar. A module writes it to
 
 ---
 
-## 7. For Rust: the `proto` crate
+## 8. For Rust: the `proto` crate
 
 The `proto` crate in the repository has `serde` types for every message (`ModIn`, `ModOut`, `Screen`, `Row`, `Msg`) and a few helpers:
 
@@ -215,6 +244,6 @@ The `proto` crate in the repository has `serde` types for every message (`ModIn`
 
 ---
 
-## 8. Licensing
+## 9. Licensing
 
 The Polynya core is licensed under **GPLv3**, while the protocol specification and the `proto` crate are under **[MIT](../proto/LICENSE)**. You can write modules in any language and publish them under any license, including closed and commercial ones. The only limit is the brand: "a module for Polynya" is fine, but presenting your build or plugin as an official Polynya product is not (see **[TRADEMARKS.md](../TRADEMARKS.md)**).

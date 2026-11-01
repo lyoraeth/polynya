@@ -13,6 +13,7 @@ use windows::{
 };
 
 use super::{Area, PanelView, Reveal};
+use crate::island::image;
 use crate::{
     edit::{Edited, LineEdit},
     icons,
@@ -67,6 +68,8 @@ const KEYS_AT: f32 = 0.56;
 /// Input field: inset from the row and the text padding when the pill is narrow.
 const FIELD_INSET: f32 = 3.0;
 const FIELD_PAD: f32 = 10.0;
+const IMAGE_PAD: f32 = 8.0;
+const CAPTION_H: f32 = 22.0;
 
 #[derive(Debug, PartialEq)]
 pub enum MenuEffect {
@@ -77,6 +80,7 @@ pub enum MenuEffect {
     /// A row bound to a module function: run it like from search, with `source: menu`.
     Run(String),
     Submit(String, String),
+    Preview(usize),
     Leave,
 }
 
@@ -108,10 +112,11 @@ pub struct MenuPanel {
     /// Wider than a taskbar menu: the module opened under the search block.
     pub wide: bool,
     switches: std::collections::HashMap<String, f32>,
+    images: std::collections::HashMap<usize, Option<image::Bitmap>>,
 }
 
 fn selectable(r: &Row) -> bool {
-    matches!(r, Row::Item { .. } | Row::Toggle { .. } | Row::Input { .. } | Row::Button { .. })
+    matches!(r, Row::Item { .. } | Row::Toggle { .. } | Row::Input { .. } | Row::Button { .. }) || matches!(r, Row::Image { image, .. } if image.preview)
 }
 
 /// Id of a row the user can act on.
@@ -122,9 +127,31 @@ fn row_id(r: &Row) -> Option<&str> {
     }
 }
 
-fn row_h(r: &Row) -> f32 {
+fn panel_w(page: bool, wide: bool) -> f32 {
+    if page {
+        PAGE_W
+    } else if wide {
+        WIDE_W
+    } else {
+        W
+    }
+}
+
+fn full_decode_w(content_w: f32) -> u32 {
+    // Twice the DIP width is enough for 200% DPI without decoding a 1200 px image for every panel.
+    (content_w.ceil() as u32).saturating_mul(2).max(1)
+}
+
+fn row_h(r: &Row, content_w: f32) -> f32 {
     match r {
+        Row::Item { image: Some(_), .. } => image::THUMB + IMAGE_PAD * 2.0,
         Row::Item { .. } | Row::Toggle { .. } | Row::Input { .. } => ITEM_H,
+        Row::Image { image, caption } => {
+            let raster = crate::images::get(image, full_decode_w(content_w));
+            let ratio = crate::images::aspect(image, raster.as_deref());
+            let height = (content_w / ratio).min(image::MAX_FULL_H);
+            IMAGE_PAD * 2.0 + height + if caption.is_empty() { 0.0 } else { CAPTION_H }
+        }
         Row::Button { .. } => BUTTON_H,
         Row::Section { title } if title.is_empty() => GAP_H,
         Row::Section { .. } => SECTION_H,
@@ -162,6 +189,7 @@ fn flatten(screen: &mut Screen) {
                 fix(text);
                 fix(hint);
             }
+            Row::Image { caption, .. } => fix(caption),
             Row::Toggle { text, .. } | Row::Button { text, .. } => fix(text),
             Row::Input { text, placeholder, .. } => {
                 fix(text);
@@ -202,8 +230,14 @@ impl MenuPanel {
         self.screen()?.rows.iter().position(selectable)
     }
 
+    /// Releases D2D bitmaps when the dropdown closes; the small CPU cache stays for reopening.
+    pub fn clear_images(&mut self) {
+        self.images.clear();
+    }
+
     pub fn show(&mut self, module: String, mut screen: Screen) {
         flatten(&mut screen);
+        self.images.clear();
         self.page = false;
         self.wide = false;
         self.module = module;
@@ -219,6 +253,7 @@ impl MenuPanel {
     /// row by id, so a module can redraw the screen while the user works in it.
     pub fn replace(&mut self, mut screen: Screen) {
         flatten(&mut screen);
+        self.images.clear();
         let id_at = |s: Option<&Screen>, i: usize| s.and_then(|s| s.rows.get(i)).and_then(row_id).map(String::from);
         let sel_id = self.sel.and_then(|i| id_at(self.screen(), i));
         let edit_id = self.edit.as_ref().and_then(|e| id_at(self.screen(), e.row));
@@ -246,6 +281,7 @@ impl MenuPanel {
 
     pub fn replace_root(&mut self, mut screen: Screen) {
         flatten(&mut screen);
+        self.images.clear();
         if self.stack.len() > 1 {
             self.stack[0] = screen;
         }
@@ -322,6 +358,7 @@ impl MenuPanel {
 
     pub fn push(&mut self, mut screen: Screen) {
         flatten(&mut screen);
+        self.images.clear();
         self.stack.push(screen);
         self.go(1.0);
     }
@@ -352,6 +389,7 @@ impl MenuPanel {
         let (id, confirm, command) = match row {
             Some(Row::Item { id, confirm, command, .. }) => (id, confirm, command),
             Some(Row::Toggle { id, .. }) | Some(Row::Button { id, .. }) => (id, None, String::new()),
+            Some(Row::Image { image, .. }) if image.preview => return MenuEffect::Preview(i),
             Some(Row::Input { text, .. }) => {
                 self.sel = Some(i);
                 self.edit = Some(Edit { row: i, line: LineEdit::new(&text) });
@@ -412,14 +450,8 @@ impl MenuPanel {
 
 impl PanelView for MenuPanel {
     fn size(&self) -> (f32, f32) {
-        let rows: f32 = self.screen().map_or(0.0, |s| s.rows.iter().map(row_h).sum());
-        let w = if self.page {
-            PAGE_W
-        } else if self.wide {
-            WIDE_W
-        } else {
-            W
-        };
+        let w = panel_w(self.page, self.wide);
+        let rows: f32 = self.screen().map_or(0.0, |s| s.rows.iter().map(|r| row_h(r, w - PAD_X * 2.0)).sum());
         (w, PAD_T + if self.has_title() { TITLE_H } else { 0.0 } + rows + PAD_B)
     }
 
@@ -464,16 +496,17 @@ impl PanelView for MenuPanel {
             y += TITLE_H;
         }
 
+        // Image decoding and row layout use the stable panel width, not the opening spring's width.
+        let content_w = panel_w(self.page, self.wide) - PAD_X * 2.0;
         let hovered = screen.rows.iter().scan(y, |top, row| {
             let t = *top;
-            *top += row_h(row);
+            *top += row_h(row, content_w);
             Some(t)
         });
         let tops: Vec<f32> = hovered.collect();
-        let hover =
-            screen.rows.iter().enumerate().find(|(i, row)| {
-                selectable(row) && f.mouse.is_some_and(|(mx, my)| inside((l + ROW_INSET, tops[*i], r - ROW_INSET, tops[*i] + ITEM_H), mx, my))
-            });
+        let hover = screen.rows.iter().enumerate().find(|(i, row)| {
+            selectable(row) && f.mouse.is_some_and(|(mx, my)| inside((l + ROW_INSET, tops[*i], r - ROW_INSET, tops[*i] + row_h(row, content_w)), mx, my))
+        });
         // Mouse moved over item: transfer selection and keep it.
         let moved = f.mouse != self.last_mouse;
         self.last_mouse = f.mouse;
@@ -496,7 +529,7 @@ impl PanelView for MenuPanel {
                     let cy = top + BUTTON_H / 2.0;
                     (l + ROW_INSET, cy - BUTTON_PILL / 2.0, r - ROW_INSET, cy + BUTTON_PILL / 2.0)
                 }
-                _ => (l + ROW_INSET, top, r - ROW_INSET, top + ITEM_H),
+                _ => (l + ROW_INSET, top, r - ROW_INSET, top + screen.rows.get(i).map_or(ITEM_H, |r| row_h(r, content_w))),
             }
         });
         self.glide.step(target, f.t);
@@ -508,10 +541,30 @@ impl PanelView for MenuPanel {
             let (a, rise) = reveal.row(i + 1);
             let a = a * p;
             let top = tops[i] + rise;
-            let h = row_h(row);
+            let h = row_h(row, content_w);
             match row {
-                Row::Item { text, hint, keys, confirm, .. } => {
-                    let tx = l + PAD_X;
+                Row::Item { text, hint, keys, confirm, image, .. } => {
+                    if let Some(img) = image {
+                        let rect =
+                            D2D_RECT_F { left: l + PAD_X, top: top + IMAGE_PAD, right: l + PAD_X + image::THUMB, bottom: top + IMAGE_PAD + image::THUMB };
+                        if img.preview && a > 0.5 {
+                            f.hotspots.push(Hotspot { rect: (rect.left, rect.top, rect.right, rect.bottom), kind: HotKind::ImagePreview(i) });
+                        }
+                        if let Some((bitmap, _, _)) = image::sync(f, img, 256, self.images.entry(i).or_default()) {
+                            image::draw(f, &bitmap, rect, 10.0, a, image::Fit::Cover)?;
+                        } else {
+                            set_opacity(&f.br.plate, a);
+                            // SAFETY: the brush and rectangle are valid for this D2D call.
+                            unsafe { f.dc.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect, radiusX: 10.0, radiusY: 10.0 }, &f.br.plate) };
+                            set_opacity(&f.br.plate, 1.0);
+                            if !img.alt.is_empty() {
+                                let alt = f.txt(&img.alt, Font::Small, Style::trim(image::THUMB - 8.0))?;
+                                set_opacity(&dim, a);
+                                draw_text(f.dc, &alt, rect.left + 4.0, top + h / 2.0 - alt.h / 2.0, &dim);
+                            }
+                        }
+                    }
+                    let tx = l + PAD_X + image.as_ref().map_or(0.0, |_| image::THUMB + image::THUMB_GAP);
                     let rect = (l + ROW_INSET, top, r - ROW_INSET, top + h);
                     if a > 0.5 {
                         f.hotspots.push(Hotspot { rect, kind: HotKind::MenuRow(i) });
@@ -563,6 +616,31 @@ impl PanelView for MenuPanel {
                                 &fg,
                             );
                         }
+                    }
+                }
+                Row::Image { image: img, caption } => {
+                    let image_h = h - IMAGE_PAD * 2.0 - if caption.is_empty() { 0.0 } else { CAPTION_H };
+                    let rect = D2D_RECT_F { left: l + PAD_X, top: top + IMAGE_PAD, right: r - PAD_X, bottom: top + IMAGE_PAD + image_h };
+                    if img.preview && a > 0.5 {
+                        f.hotspots.push(Hotspot { rect: (rect.left, rect.top, rect.right, rect.bottom), kind: HotKind::ImagePreview(i) });
+                    }
+                    if let Some((bitmap, _, _)) = image::sync(f, img, full_decode_w(content_w), self.images.entry(i).or_default()) {
+                        image::draw(f, &bitmap, rect, 12.0, a, image::Fit::Contain)?;
+                    } else {
+                        set_opacity(&f.br.plate, a);
+                        // SAFETY: the brush and rectangle are valid for this D2D call.
+                        unsafe { f.dc.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect, radiusX: 12.0, radiusY: 12.0 }, &f.br.plate) };
+                        set_opacity(&f.br.plate, 1.0);
+                        if !img.alt.is_empty() {
+                            let alt = f.txt(&img.alt, Font::Small, Style::trim(rect.right - rect.left - 16.0))?;
+                            set_opacity(&dim, a);
+                            draw_text(f.dc, &alt, rect.left + 8.0, rect.top + image_h / 2.0 - alt.h / 2.0, &dim);
+                        }
+                    }
+                    if !caption.is_empty() {
+                        let text = f.txt(caption, Font::Small, Style::trim(content_w))?;
+                        set_opacity(&dim, a);
+                        draw_text(f.dc, &text, l + PAD_X, rect.bottom + 4.0, &dim);
                     }
                 }
                 Row::Toggle { id, text, on } => {

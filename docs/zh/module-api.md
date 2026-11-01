@@ -164,7 +164,8 @@ hotkey.devtools.convert =
 
 | `type` | 字段 | 说明 |
 | :--- | :--- | :--- |
-| `item` | `id`、`text`、`hint?`、`command?`、`keys?`、`confirm?` | 可选择的行；`hint` 以较淡的颜色显示在右侧。`command` 让这一行成为模块的功能：核心在窄列中显示该功能的快捷键，并用 `"source": "menu"` 的 `invoke` 代替 `select`。`keys` 用于显示不属于模块的快捷键（例如 `Win+L`）。带有 `confirm`（例如 `"现在重启？"`）时，第一次按下会显示该问题和一条逐渐缩短的进度条，只有在 3 秒内再按一次才会生效。 |
+| `item` | `id`、`text`、`hint?`、`command?`、`keys?`、`confirm?`、`image?` | 可选择的行；`hint` 以较淡的颜色显示在右侧。`command` 让这一行成为模块的功能：核心在窄列中显示该功能的快捷键，并用 `"source": "menu"` 的 `invoke` 代替 `select`。`keys` 用于显示不属于模块的快捷键（例如 `Win+L`）。带有 `confirm`（例如 `"现在重启？"`）时，第一次按下会显示该问题和一条逐渐缩短的进度条，只有在 3 秒内再按一次才会生效。`image` 在左侧添加 56×56 DIP 的缩略图；行操作保持不变，启用预览后点击缩略图即可打开。 |
+| `image` | `image`、`caption?` | 按面板宽度显示的图片，保持宽高比，下方可带说明文字。高度上限为 360 DIP；过高的图片会完整缩小而不裁剪。 |
 | `toggle` | `id`、`text`、`on` | 带开关的行。按下时发送 `select`，模块用带有新 `on` 值的 `update` 回复。 |
 | `input` | `id`、`text`、`placeholder?` | 文本输入框。按下后开始编辑，光标位于鼠标所在处；拖动可选择，双击选择一个词，长文本会滚动，支持剪贴板、`Ctrl+Z` 和 IME。Enter 发送 `submit`，Esc 取消。`text` 是当前值。 |
 | `button` | `id`、`text`、`plain?` | 占满整行宽度的按钮。`plain: true` 时不绘制背景。 |
@@ -179,9 +180,36 @@ hotkey.devtools.convert =
 
 ---
 
-## 6. 卡片
+## 6. 图片（API 2）
 
-卡片是任务栏右侧区域中的通知。模块把它写入自己的 `stdout`。其他任何程序可以把它发送到命名管道 `\\.\pipe\Polynya-<SessionId>`（每次连接一条 JSON 消息，最大 64 KB），或者在命令行中使用 `polynya push`。
+在 `item`、`image` 行或卡片中使用 `ImageRef`。必须且只能指定一个来源：`path` 或 `data`。
+
+```json
+{"path": "C:/images/chart.png", "alt": "每周负载", "preview": true, "width": 1200, "height": 600}
+```
+
+```json
+{"data": "iVBORw0KGgoAAA...", "mime": "image/png", "alt": "每周负载", "preview": true}
+```
+
+| 字段 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `path` | `null` | 图片文件的绝对路径。不接受相对路径或 URL。 |
+| `data` | `null` | Base64 编码的图片字节，是 `path` 的替代方式；不能同时提供两者。 |
+| `mime` | `null` | 使用 `data` 时必填：`image/png`、`image/jpeg`、`image/svg+xml`、`image/gif`、`image/bmp`、`image/x-icon`、`image/tiff` 或 `image/webp`。 |
+| `alt` | `""` | 无障碍文本，以及加载中或解码失败时显示的占位文本。 |
+| `preview` | `false` | 点击后使用 Windows 中该格式的默认应用打开原图。嵌入数据会先写入临时文件。 |
+| `width`、`height` | `null` | 可选的原始尺寸，用于在解码前预留宽高比。 |
+
+位图通过 Windows Imaging Component (WIC) 解码，SVG 通过 `resvg` 渲染；外部链接资源会被忽略。SVG 文本可使用已安装字体和 CJK 回退字体，只有包含文本时才加载系统字体目录。解码在后台进行并缓存，不会逐帧重复。全宽图片高度上限为 360 DIP，缩略图从中心裁剪为 56×56 DIP。
+
+限制：每条管道消息 **16 MiB**、每个源图片 **12 MiB**、总像素数 **1600 万**。格式不受支持、Base64 无效、文件缺失或超出限制时，会显示占位内容并记录警告.
+
+---
+
+## 7. 卡片
+
+卡片是任务栏右侧区域中的通知。模块把它写入自己的 `stdout`。其他任何程序可以把它发送到命名管道 `\\.\pipe\Polynya-<SessionId>`（每次连接一条 JSON 消息，最大 16 MiB），或者在命令行中使用 `polynya push`。
 
 ```json
 {"op": "chip", "key": "build", "title": "构建完成", "body": "48 秒", "icon": "ok", "ttl_ms": 5000}
@@ -198,6 +226,7 @@ hotkey.devtools.convert =
 | `animated` | `false` | 动画图标：表示工作正在进行。 |
 | `source` | `key` | 系列：同一来源的卡片在队列中不会相互等待。 |
 | `popup` | `false` | 卡片排到第一位时，以紧凑的下拉面板展开。 |
+| `image` | `null` | 在展开的通知中显示为 56×56 DIP 缩略图的 `ImageRef`。 |
 | `swatches` | `[]` | 展开卡片中显示的 `#rrggbb` 颜色；点击可复制。 |
 | `mark` | `null` | `swatches` 中高亮颜色的索引。 |
 
@@ -205,7 +234,7 @@ hotkey.devtools.convert =
 
 ---
 
-## 7. Rust：`proto` crate
+## 8. Rust：`proto` crate
 
 仓库中的 `proto` crate 为所有消息（`ModIn`、`ModOut`、`Screen`、`Row`、`Msg`）提供了 `serde` 类型，以及几个辅助函数：
 
@@ -215,6 +244,6 @@ hotkey.devtools.convert =
 
 ---
 
-## 8. 许可
+## 9. 许可
 
 Polynya 核心采用 **GPLv3** 许可，而协议规范和 `proto` crate 采用 **[MIT](../../proto/LICENSE)** 许可。你可以用任何语言编写模块，并以任何许可发布，包括闭源和商业许可。唯一的限制是品牌：可以写“适用于 Polynya 的模块”，但不能把你的构建或插件说成是 Polynya 官方产品（见 **[TRADEMARKS.md](../../TRADEMARKS.md)**）。

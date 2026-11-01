@@ -58,7 +58,7 @@ pub enum Act {
 }
 
 fn item(id: &str, text: &str, hint: String) -> Row {
-    Row::Item { id: id.into(), text: text.into(), hint, keys: String::new(), command: String::new(), confirm: None }
+    Row::Item { id: id.into(), text: text.into(), hint, keys: String::new(), command: String::new(), confirm: None, image: None }
 }
 
 /// The "Settings" row in search; opens them right there as a search page.
@@ -237,6 +237,7 @@ pub fn modules_screen() -> Screen {
                     keys: String::new(),
                     command: String::new(),
                     confirm: None,
+                    image: None,
                 });
             }
             rows.push(Row::Toggle { id: "notify.banners".into(), text: tr.notify_banners.into(), on: c.notify_ours });

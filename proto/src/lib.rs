@@ -45,7 +45,8 @@ pub fn pipe() -> HSTRING {
 /// Mutex name to detect if the core process is currently running.
 pub const INSTANCE_MUTEX: PCWSTR = w!("Polynya.single-instance");
 /// Maximum message size to prevent memory exhaustion from malformed pipe data.
-pub const MAX_MSG: usize = 64 * 1024;
+/// API 2 allows embedded images, so a message may be much larger than plain JSON.
+pub const MAX_MSG: usize = 16 * 1024 * 1024;
 
 /// Message sent to the core.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -80,6 +81,9 @@ pub enum Msg {
         /// Windows notification AUMID. Clicking opens the source application.
         #[serde(default)]
         app: Option<String>,
+        /// Image shown as a thumbnail in the expanded notification.
+        #[serde(default)]
+        image: Option<ImageRef>,
         /// Immediately expand as a compact popup (replaces system banner).
         #[serde(default)]
         popup: bool,
@@ -96,6 +100,26 @@ pub enum Msg {
 
 fn default_icon() -> String {
     "info".into()
+}
+
+/// Image supplied by a module: an absolute file path or Base64 bytes with a MIME type.
+/// Width and height are optional hints used to reserve the aspect ratio before loading.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ImageRef {
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub data: Option<String>,
+    #[serde(default)]
+    pub mime: Option<String>,
+    #[serde(default)]
+    pub alt: String,
+    #[serde(default)]
+    pub preview: bool,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
 }
 
 /// Module dropdown screen: optional title with a "back" button and a list of rows.
@@ -126,6 +150,15 @@ pub enum Row {
         command: String,
         #[serde(default)]
         confirm: Option<String>,
+        /// Thumbnail to the left of the row text. The row keeps its normal action.
+        #[serde(default)]
+        image: Option<ImageRef>,
+    },
+    /// Image fitted to the panel width, with an optional caption below it.
+    Image {
+        image: ImageRef,
+        #[serde(default)]
+        caption: String,
     },
     /// Toggle switch: label on the left, slider on the right. Pressing acts like an Item.
     Toggle { id: String, text: String, on: bool },
@@ -235,6 +268,8 @@ pub enum Source {
 
 /// A line a module wrote to its stdout: a dropdown message or a chip message.
 #[derive(Debug, PartialEq)]
+// Lines are parsed and handled one at a time, so the largest variant costs nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum Line {
     Out(ModOut),
     Msg(Msg),
@@ -495,7 +530,15 @@ mod tests {
             screen: Screen {
                 title: None,
                 rows: vec![
-                    Row::Item { id: "a".into(), text: "A".into(), hint: String::new(), keys: String::new(), command: String::new(), confirm: None },
+                    Row::Item {
+                        id: "a".into(),
+                        text: "A".into(),
+                        hint: String::new(),
+                        keys: String::new(),
+                        command: String::new(),
+                        confirm: None,
+                        image: None,
+                    },
                     Row::Divider,
                 ],
             },
@@ -504,6 +547,25 @@ mod tests {
         let line = serde_json::to_string(&m).unwrap();
         assert_eq!(serde_json::from_str::<ModOut>(&line).unwrap(), m);
         assert!(line.contains(r#""type":"divider""#));
+    }
+
+    #[test]
+    fn image_roundtrip() {
+        let image = ImageRef {
+            path: None,
+            data: Some("iVBORw0KGgo=".into()),
+            mime: Some("image/png".into()),
+            alt: "Chart".into(),
+            preview: true,
+            width: Some(1200),
+            height: Some(600),
+        };
+        let row = Row::Image { image: image.clone(), caption: "Week".into() };
+        let line = serde_json::to_string(&row).unwrap();
+        assert_eq!(serde_json::from_str::<Row>(&line).unwrap(), row);
+        let chip = serde_json::json!({"op":"chip","key":"image","title":"Chart","image":image});
+        let Msg::Chip { image, .. } = serde_json::from_value::<Msg>(chip).unwrap() else { panic!() };
+        assert_eq!(image.unwrap().mime.as_deref(), Some("image/png"));
     }
 
     #[test]

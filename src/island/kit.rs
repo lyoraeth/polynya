@@ -608,6 +608,7 @@ pub enum HotKind {
     LaunchAct(usize),
     Swatch(usize),
     OpenApp,
+    ImagePreview(usize),
     MenuRow(usize),
     MenuBack,
     Seek { duration: f64 },

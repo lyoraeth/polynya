@@ -346,6 +346,7 @@ fn note(pid: u32, cmdline: &str, took: Duration, code: i32) -> Note {
         key: format!("term:{pid}"),
         source: None,
         app: None,
+        image: None,
         popup: false,
         icon: if code == 0 { Icon::Ok } else { Icon::Fail },
         title: format!("{} · {}", short_command(cmdline), duration(took, tr)),

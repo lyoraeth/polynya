@@ -1,40 +1,33 @@
-The first public release.
+Polynya 1.1.0 adds native Kimi Code support, image rendering in the module API, and bundled legal notices across all distribution packages.
 
-Polynya is a lightweight launcher for Windows 11 that doesn't hide until you press a hotkey: it lives right in the taskbar. `Alt+Space` opens search for apps and files, a calculator and a currency converter. Time, weather, a player with a visualizer and notifications are always in sight, and the island follows the taskbar's color and edge, the theme, the accent and the wallpaper. Written in Rust: 0% CPU and about 30 MB of memory at rest.
+### What's new
 
-Everything else is modules. A module is a separate process in any language: it hands over data, and the island draws its interface, puts its functions on global hotkeys and passes it the selected text. The API is open and documented.
+- **Kimi Code in AI agents.** The module now tracks Kimi Code alongside Claude Code, Codex, and Cursor: thinking process, tool calls, permission waits, task completion, errors, and interruptions. Hooks are registered automatically and cleaned up whenever the module is disabled.
+- **Images in modules (API v2).** Modules can now attach raster images and SVG documents via absolute file paths or Base64 payloads. The island renders thumbnails and full-width visuals with preserved aspect ratios, including media inside expanded notifications. With `preview: true`, clicking an image opens the original file in the default Windows viewer. Existing `api = 1` modules remain fully supported.
+- **Start Menu shortcut.** The installer now registers Polynya in the Start Menu and within `shell:AppsFolder`, making it indexable by standard Windows Search and discoverable within Polynya's own launcher.
+- **Legal documentation in every package.** The installer presents the GPL license and bundles `LICENSE.txt` along with the generated `NOTICE.txt` into the application directory next to `polynya.exe`. Both files are also included directly in the portable archives.
 
 ### Which file to download
 
-| File | For whom |
+| File | Target audience |
 | :--- | :--- |
-| `Polynya-1.0.0-x64-setup.exe` | Most people. An installer without admin rights, with a choice of modules; it can also install Everything for file search. |
-| `Polynya-1.0.0-arm64-setup.exe` | The same for Windows on ARM (Snapdragon and others). |
-| `…-portable.zip` + `…-modules.zip` | The portable version: unpack both archives into one folder and run `polynya.exe`. Nothing is installed into the system. |
+| `Polynya-1.1.0-x64-setup.exe` | Recommended for most users. Standard installer running without elevated admin rights, featuring module selection and an optional Everything file search component. |
+| `Polynya-1.1.0-arm64-setup.exe` | The same installer package built natively for Windows on ARM (Snapdragon and compatible hardware). |
+| `…-portable.zip` + `…-modules.zip` | Portable version: extract both archives into the same folder and launch `polynya.exe`. Leaves no traces in the system registry or AppData. |
 
 Requires Windows 11. Windows 10 is not supported.
 
-### Polynya
-
-- Launcher: apps, files via Everything, calculator, currencies, module commands.
-- Time and weather with an hourly and three-day forecast.
-- Player with a visualizer for any Windows media session.
-- Notification stack: from modules, from long terminal commands and from your own scripts via `polynya push`.
-- Interface in English, Russian, Chinese and Japanese.
-
 ### Bundled modules
 
-- **AI agents**: the status of Claude Code, Codex, Cursor and Kimi Code in the taskbar; the hooks are set up automatically.
-- **Color picker**: a live loupe and an OKLCH palette.
-- **Windows notifications** (experimental, off by default): system notifications in the island instead of the standard banners. Installing it asks for UAC once.
+- **AI agents**: Real-time status tracking for Claude Code, Codex, Cursor, and Kimi Code directly on the taskbar (hooks configure automatically).
+- **Color picker**: Live screen loupe with integrated OKLCH color space palette.
+- **Windows notifications** (experimental, disabled by default): System notifications rendered directly inside the island instead of standard toast banners. Requires an initial one-time UAC prompt during setup.
 
-### Modules in development
-
-- Custom Start, devtools for web development, clipboard history.
+Custom Start, web development devtools, and clipboard history are actively in development and are scheduled for future updates.
 
 ### Known issues
 
-- The builds are not code-signed yet. Windows may show "Windows protected your PC": click **More info → Run anyway**.
-- With a vertical taskbar the island hides; with an auto-hiding taskbar it doesn't hide along with it yet.
+- Binaries are not yet digitally signed with an EV/OV certificate. Windows SmartScreen may trigger a warning ("Windows protected your PC"): click **More info → Run anyway**.
+- The island automatically hides on vertical taskbar layouts; auto-hiding taskbars are not yet dynamically synchronized with island visibility.
 
-Documentation: [user guide](https://github.com/lyoraeth/polynya/blob/main/docs/guide.md) · [limitations and FAQ](https://github.com/lyoraeth/polynya/blob/main/docs/troubleshooting.md) · [module API](https://github.com/lyoraeth/polynya/blob/main/docs/module-api.md) · [на русском](https://github.com/lyoraeth/polynya/blob/main/README.ru.md)
+Documentation: [user guide](https://github.com/lyoraeth/polynya/blob/main/docs/guide.md) · [limitations and FAQ](https://github.com/lyoraeth/polynya/blob/main/docs/troubleshooting.md) · [module API](https://github.com/lyoraeth/polynya/blob/main/docs/module-api.md) · [module examples](https://github.com/lyoraeth/polynya/blob/main/docs/module-examples.md) · [на русском](https://github.com/lyoraeth/polynya/blob/main/README.ru.md)

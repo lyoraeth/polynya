@@ -16,6 +16,7 @@ mod gfx;
 mod hotkeys;
 mod i18n;
 mod icons;
+mod images;
 mod install;
 mod ipc;
 mod island;
@@ -98,6 +99,8 @@ const WM_APP_OUTSIDE: u32 = WM_APP + 2;
 const WM_APP_RESPAWN: u32 = WM_APP + 3;
 /// The media session state changed.
 const WM_APP_MEDIA: u32 = WM_APP + 4;
+/// An image finished decoding and may have changed the panel's aspect ratio.
+const WM_APP_IMAGES: u32 = WM_APP + 6;
 /// The wallpaper may have changed; from the watcher thread.
 const WM_APP_WALLPAPER: u32 = WM_APP + 20;
 /// The foreground window changed: time to check fullscreen mode.
@@ -271,6 +274,17 @@ fn media_changed() {
     }
 }
 
+/// Called from image workers: wakes the UI thread to redraw and recalculate the panel's height.
+fn images_changed() {
+    let hwnd = HWND(HWND_ISLAND.load(Ordering::Relaxed) as _);
+    if !hwnd.is_invalid() {
+        // SAFETY: posting a message has no memory-safety preconditions; a stale window only fails.
+        unsafe {
+            let _ = PostMessageW(Some(hwnd), WM_APP_IMAGES, WPARAM(0), LPARAM(0));
+        }
+    }
+}
+
 /// Wakes the UI thread with `msg`, if the window exists.
 fn wake(msg: u32) {
     let hwnd = HWND(HWND_ISLAND.load(Ordering::Relaxed) as _);
@@ -341,6 +355,7 @@ fn main() -> Result<()> {
         MEDIA.with(|m| {
             m.get_or_init(|| media::Media::start(media_changed));
         });
+        images::start(images_changed);
         audio::start();
         weather::start(cfg.city.clone(), media_changed);
         ipc::start(push_arrived);
@@ -1284,6 +1299,11 @@ impl App {
                 }
                 self.animate();
             }
+            MenuEffect::Preview(i) => {
+                if let Some(image) = self.island.menu_image(i) {
+                    images::preview(image);
+                }
+            }
             MenuEffect::Run(command) => {
                 if let Some(m) = self.island.menu_module().map(String::from)
                     && let Err(e) = modules::invoke(&m, &command, proto::Source::Menu, "", String::new())
@@ -1631,6 +1651,12 @@ impl App {
                 self.island.dismiss_open();
                 self.close();
             }
+            Action::ImagePreview(i) => {
+                let image = if self.island.menu_open() { self.island.menu_image(i) } else { self.island.note_image() };
+                if let Some(image) = image {
+                    images::preview(image);
+                }
+            }
             Action::MenuRow(i) => {
                 let e = self.island.menu_click(i);
                 self.menu_effect(e);
@@ -1786,6 +1812,15 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             WM_APP_MEDIA => {
                 if !HIDDEN.load(Ordering::Relaxed) {
                     with_app(|a| a.refresh());
+                }
+                return LRESULT(0);
+            }
+            WM_APP_IMAGES => {
+                if !HIDDEN.load(Ordering::Relaxed) {
+                    with_app(|a| {
+                        a.island.reflow();
+                        a.refresh();
+                    });
                 }
                 return LRESULT(0);
             }

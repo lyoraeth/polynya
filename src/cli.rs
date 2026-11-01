@@ -323,6 +323,7 @@ fn push(args: &[String]) -> Result<Msg, String> {
         ttl_ms: (ttl > 0).then_some(ttl * 1000),
         animated: false,
         app: None,
+        image: None,
         popup: false,
         swatches: Vec::new(),
         mark: None,

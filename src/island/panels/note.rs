@@ -12,6 +12,7 @@ use windows::{
 };
 
 use super::{Area, PanelView, Reveal};
+use crate::island::image;
 use crate::{
     icons::Icon,
     island::{
@@ -31,7 +32,6 @@ const BOX_R: f32 = 8.0;
 const BOX_GAP: f32 = 12.0;
 const CLOSE: f32 = 22.0;
 const CLOSE_GAP: f32 = 12.0;
-const TEXT_W: f32 = W - PAD_X * 2.0 - BOX - BOX_GAP - CLOSE - CLOSE_GAP;
 const TITLE_GAP: f32 = 2.0;
 const META_GAP: f32 = 6.0;
 const SWATCH_GAP: f32 = 12.0;
@@ -50,26 +50,34 @@ fn swatch_d(n: usize) -> f32 {
 pub struct NotePanel {
     note: Option<Note>,
     depth: f32,
+    image: Option<image::Bitmap>,
 }
 
 impl NotePanel {
+    /// Releases the D2D thumbnail when the notification closes.
+    pub fn clear_image(&mut self) {
+        self.image = None;
+    }
+
     /// Sets content and recalculates depth based on word-wrapped text.
     pub fn set(&mut self, texts: &Texts, dw: &IDWriteFactory, note: &Note) -> Result<()> {
         let mut note = note.clone();
+        let icon_size = if note.image.is_some() { image::THUMB } else { BOX };
+        let text_w = W - PAD_X * 2.0 - icon_size - BOX_GAP - CLOSE - CLOSE_GAP;
         if note.app.is_some() {
-            note.body = texts.clamp_lines(dw, &note.body, Font::Small, TEXT_W, APP_LINES)?;
+            note.body = texts.clamp_lines(dw, &note.body, Font::Small, text_w, APP_LINES)?;
         }
-        let mut h = texts.height(dw, &note.title, Font::Bold, TEXT_W)?;
+        let mut h = texts.height(dw, &note.title, Font::Bold, text_w)?;
         if !note.body.is_empty() {
-            h += TITLE_GAP + texts.height(dw, &note.body, Font::Small, TEXT_W)?;
+            h += TITLE_GAP + texts.height(dw, &note.body, Font::Small, text_w)?;
         }
         if !note.meta.is_empty() {
-            h += META_GAP + texts.height(dw, &note.meta, Font::Tiny, TEXT_W)?;
+            h += META_GAP + texts.height(dw, &note.meta, Font::Tiny, text_w)?;
         }
         if !note.swatches.is_empty() {
             h += SWATCH_GAP + swatch_d(note.swatches.len());
         }
-        self.depth = PAD_T + h.max(BOX) + PAD_B;
+        self.depth = PAD_T + h.max(icon_size) + PAD_B;
         self.note = Some(note);
         Ok(())
     }
@@ -93,24 +101,43 @@ impl PanelView for NotePanel {
         let br = f.br;
         let (fg, dim, soft, plate) = (br.fg.clone(), br.dim.clone(), br.soft.clone(), br.select.clone());
         let (l, r, top) = (area.left() + PAD_X, area.right() - PAD_X, area.top + PAD_T);
-        let tx = l + BOX + BOX_GAP;
+        let icon_size = if n.image.is_some() { image::THUMB } else { BOX };
+        let text_w = W - PAD_X * 2.0 - icon_size - BOX_GAP - CLOSE - CLOSE_GAP;
+        let tx = l + icon_size + BOX_GAP;
 
         // Row 0: Icon box, title, close button.
         let (a0, r0) = reveal.row(0);
         let y0 = top + r0;
-        // SAFETY: Direct2D calls on live COM objects; every argument is a value or a borrow that
-        // outlives the call.
-        unsafe {
-            set_opacity(&plate, a0);
-            f.dc.FillRoundedRectangle(
-                &D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: l, top: y0, right: l + BOX, bottom: y0 + BOX }, radiusX: BOX_R, radiusY: BOX_R },
-                &plate,
-            );
-            set_opacity(&plate, 1.0);
+        if let Some(img) = &n.image {
+            let rect = D2D_RECT_F { left: l, top: y0, right: l + icon_size, bottom: y0 + icon_size };
+            if let Some((bitmap, _, _)) = image::sync(f, img, 256, &mut self.image) {
+                image::draw(f, &bitmap, rect, BOX_R, a0, image::Fit::Cover)?;
+            } else {
+                set_opacity(&plate, a0);
+                // SAFETY: the brush and rectangle are valid for this D2D call.
+                unsafe { f.dc.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect, radiusX: BOX_R, radiusY: BOX_R }, &plate) };
+                set_opacity(&plate, 1.0);
+                if !img.alt.is_empty() {
+                    let alt = f.txt(&img.alt, Font::Small, Style::trim(icon_size - 8.0))?;
+                    set_opacity(&dim, a0);
+                    draw_text(f.dc, &alt, l + 4.0, y0 + icon_size / 2.0 - alt.h / 2.0, &dim);
+                }
+            }
+        } else {
+            // SAFETY: Direct2D calls on live COM objects; every argument is a value or a borrow that
+            // outlives the call.
+            unsafe {
+                set_opacity(&plate, a0);
+                f.dc.FillRoundedRectangle(
+                    &D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: l, top: y0, right: l + BOX, bottom: y0 + BOX }, radiusX: BOX_R, radiusY: BOX_R },
+                    &plate,
+                );
+                set_opacity(&plate, 1.0);
+            }
+            logo::note_icon(f, n, l + BOX / 2.0, y0 + BOX / 2.0, 16.0, a0)?;
         }
-        logo::note_icon(f, n, l + BOX / 2.0, y0 + BOX / 2.0, 16.0, a0)?;
         set_opacity(&fg, a0);
-        let title = f.txt(&n.title, Font::Bold, Style::wrap(TEXT_W))?;
+        let title = f.txt(&n.title, Font::Bold, Style::wrap(text_w))?;
         draw_text(f.dc, &title, tx, y0, &fg);
         set_opacity(&dim, a0);
         f.button(Icon::Close, HotKind::Dismiss, r - CLOSE / 2.0, y0 + CLOSE / 2.0, 12.0, CLOSE / 2.0, &dim, a0)?;
@@ -119,7 +146,7 @@ impl PanelView for NotePanel {
         // Row 1: Body details.
         if !n.body.is_empty() {
             let (a1, r1) = reveal.row(1);
-            let body = f.txt(&n.body, Font::Small, Style::wrap(TEXT_W))?;
+            let body = f.txt(&n.body, Font::Small, Style::wrap(text_w))?;
             set_opacity(&soft, a1);
             draw_text(f.dc, &body, tx, y + TITLE_GAP + r1, &soft);
             y += TITLE_GAP + body.h;
@@ -128,7 +155,7 @@ impl PanelView for NotePanel {
         // Row 2: Source meta.
         if !n.meta.is_empty() {
             let (a2, r2) = reveal.row(2);
-            let meta = f.txt(&n.meta, Font::Tiny, Style::wrap(TEXT_W))?;
+            let meta = f.txt(&n.meta, Font::Tiny, Style::wrap(text_w))?;
             set_opacity(&dim, a2);
             draw_text(f.dc, &meta, tx, y + META_GAP + r2, &dim);
             y += META_GAP + meta.h;
@@ -171,6 +198,9 @@ impl PanelView for NotePanel {
         // Click outside close button opens the source app.
         if n.app.is_some() && a0 > 0.5 {
             f.hotspots.push(Hotspot { rect: (area.left(), area.top, area.right(), area.top + self.depth), kind: HotKind::OpenApp });
+        }
+        if n.image.as_ref().is_some_and(|image| image.preview) && a0 > 0.5 {
+            f.hotspots.push(Hotspot { rect: (l, y0, l + icon_size, y0 + icon_size), kind: HotKind::ImagePreview(0) });
         }
         set_opacity(&fg, 1.0);
         set_opacity(&dim, 1.0);

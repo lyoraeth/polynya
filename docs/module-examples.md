@@ -2,7 +2,7 @@
 
 **English** · [Русский](ru/module-examples.md) · [简体中文](zh/module-examples.md) · [日本語](ja/module-examples.md)
 
-Four complete modules, from the smallest one up. Each fits in one file and needs no packages: copy the folder into `%LOCALAPPDATA%\Polynya\modules\` (in a portable copy, into `modules\` next to `polynya.exe`) and open search. Every field is described in the **[Module API](module-api.md)**.
+Five complete modules, from the smallest one up. Each fits in one file and needs no packages: copy the folder into `%LOCALAPPDATA%\Polynya\modules\` (in a portable copy, into `modules\` next to `polynya.exe`) and open search. Every field is described in the **[Module API](module-api.md)**.
 
 ---
 
@@ -203,6 +203,52 @@ chip(key="backup", title="Backup finished", icon="ok", ttl_ms=5000)
 ```
 
 One connection carries one message. If the island isn't running, opening the pipe fails at once.
+
+---
+
+## 5. Images (Node.js)
+
+This module shows a PNG thumbnail, a full-width SVG from Base64 and a notification with the same thumbnail. Replace the two paths with files on your machine.
+
+`modules\imagedemo\module.toml`:
+```toml
+api = 2
+id = "imagedemo"
+exe = "main.js"
+
+name.en = "Image demo"
+
+[main]
+hint.en = "A thumbnail, a full-width image and a chip"
+```
+
+`modules\imagedemo\main.js`:
+```js
+const fs = require('node:fs');
+const readline = require('node:readline');
+
+const png = 'C:/images/chart.png';
+const svg = 'C:/images/chart.svg';
+const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
+
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.op !== 'invoke' || msg.command !== 'main') return;
+
+  send({ op: 'open', screen: { title: 'Images', rows: [
+    { type: 'item', id: 'chart', text: 'Open chart', image: { path: png, alt: 'Weekly load', preview: true } },
+    { type: 'image', caption: 'Weekly load', image: {
+      data: fs.readFileSync(svg).toString('base64'),
+      mime: 'image/svg+xml', alt: 'Weekly load', preview: true,
+    } },
+  ] } });
+  send({ op: 'chip', key: 'image-demo', title: 'Chart ready', body: 'PNG thumbnail in the expanded notification',
+    image: { path: png, alt: 'Weekly load', preview: true } });
+  send({ op: 'close' });
+});
+```
+
+The row keeps its own action. A click on the image itself opens the system viewer because `preview` is enabled. `alt` is read by screen readers and shown while the image loads or if it cannot be decoded.
 
 ---
 

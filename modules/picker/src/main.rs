@@ -429,6 +429,7 @@ fn finish(pick: bool) {
             ttl_ms: Some(CHIP_TTL),
             animated: false,
             app: None,
+            image: None,
             popup: false,
             swatches: shades.into_iter().map(proto::hex).collect(),
             mark: Some(mark),

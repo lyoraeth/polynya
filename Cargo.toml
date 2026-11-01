@@ -22,7 +22,7 @@ accesskit = "0.25.2"
 accesskit_windows = "0.35.2"
 base64 = "0.23.1"
 proto = { path = "proto" }
-resvg = "0.49.0"
+resvg = { version = "0.49.0", default-features = false, features = ["svgz", "text", "system-fonts"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 toml = "1"

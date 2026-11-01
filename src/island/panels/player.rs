@@ -7,17 +7,17 @@
 use windows::{
     Win32::Graphics::Direct2D::{
         Common::{D2D_RECT_F, D2D1_GRADIENT_STOP},
-        D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_LAYER_OPTIONS1_NONE,
-        D2D1_LAYER_PARAMETERS1, D2D1_RADIAL_GRADIENT_BRUSH_PROPERTIES, D2D1_ROUNDED_RECT, ID2D1Bitmap1,
+        D2D1_INTERPOLATION_MODE_LINEAR, D2D1_RADIAL_GRADIENT_BRUSH_PROPERTIES, D2D1_ROUNDED_RECT, ID2D1Bitmap1,
     },
-    core::{Interface, Result},
+    core::Result,
 };
-use windows_numerics::{Matrix3x2, Vector2};
+use windows_numerics::Vector2;
 
 use super::{Area, PanelView, Reveal};
 use crate::{
     icons::Icon,
     island::{
+        image,
         kit::{Font, Frame, HotKind, Style, draw_text, fmt_time, gradient, set_opacity},
         segments::Data,
     },
@@ -120,36 +120,7 @@ impl PlayerPanel {
 
     /// Cover with rounded corners; non-square images are center-cropped.
     fn cover(&self, f: &Frame, cover: &ID2D1Bitmap1, rect: D2D_RECT_F, alpha: f32) -> Result<()> {
-        // SAFETY: Direct2D calls on live COM objects; `params` and its mask outlive the calls, and the
-        // mask is released exactly once at the end.
-        unsafe {
-            // Round corners via a layer with a rounded rectangle geometric mask.
-            let rr = f.gfx.d2d.CreateRoundedRectangleGeometry(&D2D1_ROUNDED_RECT { rect, radiusX: 10.0, radiusY: 10.0 })?;
-            let params = D2D1_LAYER_PARAMETERS1 {
-                contentBounds: rect,
-                geometricMask: std::mem::ManuallyDrop::new(Some(rr.cast()?)),
-                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                maskTransform: Matrix3x2::identity(),
-                opacity: alpha,
-                opacityBrush: std::mem::ManuallyDrop::new(None),
-                layerOptions: D2D1_LAYER_OPTIONS1_NONE,
-            };
-            f.dc.PushLayer(&params, None);
-            // Covers may be non-square (e.g., 16:9 video previews). Extract the center square.
-            let size = cover.GetSize();
-            let side = size.width.min(size.height);
-            let src = D2D_RECT_F {
-                left: (size.width - side) / 2.0,
-                top: (size.height - side) / 2.0,
-                right: (size.width + side) / 2.0,
-                bottom: (size.height + side) / 2.0,
-            };
-            f.dc.DrawBitmap(cover, Some(&rect), 1.0, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, Some(&src), None);
-            f.dc.PopLayer();
-            // Take the mask back out of the ManuallyDrop so the geometry is released.
-            drop(std::mem::ManuallyDrop::into_inner(params.geometricMask));
-        }
-        Ok(())
+        image::draw(f, cover, rect, 10.0, alpha, image::Fit::Cover)
     }
 }
 

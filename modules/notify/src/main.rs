@@ -183,6 +183,7 @@ fn chip(n: &UserNotification, ours: bool) -> Option<Msg> {
         ttl_ms: Some(TTL_MS),
         animated: false,
         app: Some(aumid),
+        image: None,
         // Trigger island popup only if we successfully disabled the native system banner
         popup: banner == Banner::Ours,
         swatches: Vec::new(),

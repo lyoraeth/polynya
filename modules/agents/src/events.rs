@@ -79,6 +79,7 @@ fn chip(key: String, icon: &str, title: String, project: &str, detail: &str, sou
         ttl_ms: ttl.map(|t| t * 1000),
         animated,
         app: None,
+        image: None,
         popup: false,
         swatches: Vec::new(),
         mark: None,

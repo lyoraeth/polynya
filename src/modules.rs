@@ -165,8 +165,8 @@ pub fn dir() -> Option<PathBuf> {
 }
 
 /// Manifest and protocol version the core understands: a module with a newer `api` is not loaded.
-/// Without `api` it is 1.
-const API: i64 = 1;
+/// Without `api` it is 1. API 2 adds image references in chips and screen rows.
+const API: i64 = 2;
 
 /// The manifest is TOML. Texts (`name`, `title`, `hint`) are a string or per language:
 /// `name.ru = "…"`, `name.en = "…"`; the interface language is used, else English.
@@ -555,6 +555,7 @@ fn failure(id: &str, name: &str, reason: &str) -> Msg {
         ttl_ms: Some(15_000),
         animated: false,
         app: None,
+        image: None,
         popup: false,
         swatches: Vec::new(),
         mark: None,
@@ -853,7 +854,8 @@ mod tests {
         assert!(parse("id = \"x\"\nexe = \"x.exe\"\n[[functions]]\nid = \"main\"\ntitle = \"M\"\n", Path::new("m")).is_err());
         // The package is built-in only, even if a third-party module asks for it.
         assert!(!m.package);
-        assert!(parse("id = \"x\"\nexe = \"x.exe\"\napi = 2\n", Path::new("m")).is_err());
+        assert!(parse("id = \"x\"\nexe = \"x.exe\"\napi = 2\n", Path::new("m")).is_ok());
+        assert!(parse("id = \"x\"\nexe = \"x.exe\"\napi = 3\n", Path::new("m")).is_err());
         assert!(parse("id = \"x\"\nexe = \"x.exe\"\nkind = \"tray\"\n", Path::new("m")).is_err());
         assert!(parse("id = \"a b\"\nexe = \"x.exe\"\n", Path::new("m")).is_err());
         let m = parse("id = \"x\"\nexe = \"node\"\nargs = [\"main.js\", \"--fast\"]\n", Path::new("m")).unwrap();

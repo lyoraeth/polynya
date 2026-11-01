@@ -23,6 +23,8 @@ pub use proto::INSTANCE_MUTEX;
 use proto::{MAX_MSG, Msg};
 
 /// Parsed message for the UI thread.
+// Messages are queued and handled one at a time, so the largest variant costs nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum Push {
     Notify(Note),
     Dismiss(String),
@@ -31,10 +33,11 @@ pub enum Push {
 impl From<Msg> for Push {
     fn from(m: Msg) -> Self {
         match m {
-            Msg::Chip { key, source, icon, title, body, meta, ttl_ms, animated, app, popup, swatches, mark, .. } => Push::Notify(Note {
+            Msg::Chip { key, source, icon, title, body, meta, ttl_ms, animated, app, image, popup, swatches, mark, .. } => Push::Notify(Note {
                 key,
                 source,
                 app,
+                image,
                 popup,
                 icon: Icon::parse(&icon).unwrap_or(Icon::Info),
                 title,
