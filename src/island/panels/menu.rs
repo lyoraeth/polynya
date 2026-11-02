@@ -437,12 +437,7 @@ impl MenuPanel {
         let switching = self.screen().is_some_and(|s| {
             s.rows.iter().any(|r| matches!(r, Row::Toggle { id, on, .. } if self.switches.get(id).is_some_and(|p| *p != if *on { 1.0 } else { 0.0 })))
         });
-        self.slide > 0.0 || self.glide.moving() || switching
-    }
-
-    /// The timed confirmation bar also needs frames, but stays on the background cadence.
-    pub fn moving(&self) -> bool {
-        self.interactive() || self.confirm.is_some()
+        self.slide > 0.0 || self.confirm.is_some() || self.glide.moving() || switching
     }
 
     fn has_title(&self) -> bool {
