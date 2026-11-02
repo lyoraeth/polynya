@@ -858,6 +858,11 @@ impl Island {
         part.is_some() && self.open == Some(Panel::Note) && self.open_part == part
     }
 
+    /// Dismisses notifications owned by a disabled event source with multiple session keys.
+    pub fn dismiss_prefixes(&mut self, prefixes: &[&str]) -> bool {
+        self.zone.dismiss_prefixes(prefixes)
+    }
+
     pub fn take_zone(&mut self) -> Zone {
         std::mem::take(&mut self.zone)
     }

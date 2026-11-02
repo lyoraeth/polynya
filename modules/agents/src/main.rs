@@ -37,6 +37,10 @@ fn main() {
         Some("codex") => args.last().and_then(|a| serde_json::from_str::<Value>(a).ok()).and_then(|v| events::codex(&v, tr)),
         _ => None,
     };
+    // An already running agent may keep its hooks after unregistering them in its config file.
+    if proto::module_disabled("agents") {
+        return;
+    }
     if let Some(msg) = msg {
         // Core not running: there is nobody to tell, and that is not an error.
         let _ = proto::send(&msg);

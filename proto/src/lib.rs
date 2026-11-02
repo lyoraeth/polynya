@@ -436,6 +436,12 @@ fn config_value(key: &str) -> Option<String> {
         .map(|(_, v)| v.trim().to_lowercase())
 }
 
+/// Whether a module is explicitly disabled. External hooks use this on every event because their
+/// host process may keep the old hook registration in memory after the core unregisters it.
+pub fn module_disabled(id: &str) -> bool {
+    config_value("modules_off").is_some_and(|list| list.split([' ', ',']).any(|listed| listed == id))
+}
+
 /// Name of the file that marks a portable copy when it lies next to the core exe.
 pub const PORTABLE_MARKER: &str = "portable";
 

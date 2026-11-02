@@ -265,6 +265,16 @@ impl Zone {
         Some(part)
     }
 
+    /// Dismisses every active notification whose key belongs to one of the given namespaces.
+    pub fn dismiss_prefixes(&mut self, prefixes: &[&str]) -> bool {
+        let parts: Vec<Part> =
+            self.chips.iter().filter(|c| !c.leaving && prefixes.iter().any(|prefix| c.note.key.starts_with(prefix))).map(|c| c.part()).collect();
+        for part in &parts {
+            self.dismiss(*part);
+        }
+        !parts.is_empty()
+    }
+
     pub fn shows(&self, anim: super::logo::Anim) -> bool {
         self.chips.iter().any(|c| c.shown > 0.0 && super::logo::anim(&c.note) == Some(anim))
     }
@@ -572,6 +582,19 @@ mod tests {
         assert!(z.next_deadline().is_some_and(|d| d <= Instant::now()));
         z.step(0.01, None, None, None, 0.18);
         assert_eq!(order(&z)[0], "b");
+    }
+
+    #[test]
+    fn dismisses_disabled_agent_sessions() {
+        let t = Instant::now();
+        let mut z = Zone::default();
+        z.notify_at(note("kimi:k1", None), t);
+        z.notify_at(note("claude:c1", None), t);
+        z.notify_at(note("other", None), t);
+        assert!(z.dismiss_prefixes(&["claude:", "codex:", "cursor:", "kimi:"]));
+        z.step(1.0, None, None, None, 0.18);
+        assert_eq!(order(&z), ["other"]);
+        assert!(!z.dismiss_prefixes(&["claude:", "codex:", "cursor:", "kimi:"]));
     }
 
     #[test]

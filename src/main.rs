@@ -1234,7 +1234,12 @@ impl App {
             Some(settings::Change::City(c)) => weather::set_city(c),
             Some(settings::Change::Terminal(s)) => TERMINAL_MIN.store(s, Ordering::Relaxed),
             Some(settings::Change::Module(id)) => {
-                modules::toggled(&id, &modules::off(&config::load()), vertical());
+                let off = modules::off(&config::load());
+                if id == "agents" && off.iter().any(|id| id == "agents") {
+                    self.island.dismiss_prefixes(&["claude:", "codex:", "cursor:", "kimi:"]);
+                    self.sync_note_timer();
+                }
+                modules::toggled(&id, &off, vertical());
                 sync_hotkeys(self.hwnd);
             }
             None => {}
