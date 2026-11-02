@@ -215,7 +215,7 @@ impl MenuPanel {
         f.cut_if_long((l, cy - ITEM_H / 2.0, r, cy + ITEM_H / 2.0), text, Font::Text, r - l)?;
         if self.sel == Some(i) {
             let t = f.txt(text, Font::Text, Style::Plain)?;
-            return f.marquee(&t, l, r, cy, brush, a, self.sel_at, MARQUEE_DELAY);
+            return f.layered_marquee(&format!("menu:{}:row:{i}", self.module), text, &t, l, r, cy, brush, a, self.sel_at, MARQUEE_DELAY);
         }
         let t = f.txt(text, Font::Text, Style::trim(r - l))?;
         draw_text(f.dc, &t, l, cy - t.h / 2.0, brush);
@@ -794,7 +794,18 @@ impl PanelView for MenuPanel {
                     set_opacity(&fg, a);
                     draw_text(f.dc, &t, l + PAD_X, ty, &fg);
                     set_opacity(&dim, a);
-                    f.marquee(&s, l + PAD_X, r - PAD_X, ty + t.h + 2.0 + s.h / 2.0, &dim, a, since, MARQUEE_DELAY)?;
+                    f.layered_marquee(
+                        &format!("menu:{}:header:{i}", self.module),
+                        subtitle,
+                        &s,
+                        l + PAD_X,
+                        r - PAD_X,
+                        ty + t.h + 2.0 + s.h / 2.0,
+                        &dim,
+                        a,
+                        since,
+                        MARQUEE_DELAY,
+                    )?;
                 }
                 Row::Art { lines, colors } => {
                     let cw = f.txt("M", Font::Mono, Style::Plain)?.w;
@@ -831,7 +842,7 @@ impl PanelView for MenuPanel {
                     set_opacity(&dim, a);
                     draw_text(f.dc, &k, l + PAD_X, cy - k.h / 2.0, &dim);
                     set_opacity(&fg, a);
-                    f.marquee(&v, r - PAD_X - vw, r - PAD_X, cy, &fg, a, since, MARQUEE_DELAY)?;
+                    f.layered_marquee(&format!("menu:{}:pair:{i}", self.module), value, &v, r - PAD_X - vw, r - PAD_X, cy, &fg, a, since, MARQUEE_DELAY)?;
                 }
             }
         }

@@ -377,7 +377,6 @@ pub struct Island {
     note_panel: NotePanel,
     stack_panel: StackPanel,
     launcher: LauncherPanel,
-    text_running: bool,
     menu: MenuPanel,
     zone: Zone,
     dw: IDWriteFactory,
@@ -400,6 +399,8 @@ pub struct Island {
     scroll: Option<scroller::Request>,
     panel_scroller: Option<scroller::Scroller>,
     panel_scroll: Option<scroller::Request>,
+    marquees: Vec<(String, scroller::Request)>,
+    marquee_layers: std::collections::HashMap<String, scroller::Scroller>,
     hotspots: Vec<Hotspot>,
     /// Texts cut to fit in the last frame, see `Frame::cut`.
     cut: Vec<(Rect, String)>,
@@ -492,7 +493,6 @@ impl Island {
             px: 1.0,
             vignette: None,
             free: None,
-            text_running: false,
             menu: MenuPanel::default(),
             zone: Zone::default(),
             dw: dw.clone(),
@@ -513,6 +513,8 @@ impl Island {
             scroll: None,
             panel_scroller: None,
             panel_scroll: None,
+            marquees: Vec::new(),
+            marquee_layers: std::collections::HashMap::new(),
             hotspots: Vec::new(),
             cut: Vec::new(),
         })
@@ -1004,7 +1006,7 @@ impl Island {
 
     /// Whether only the transparent composition layer needs monitor-rate frames.
     pub fn layer_frames(&self) -> bool {
-        [self.scroll.as_ref(), self.panel_scroll.as_ref()].into_iter().flatten().any(|req| req.alpha_mask)
+        [self.scroll.as_ref(), self.panel_scroll.as_ref()].into_iter().flatten().any(|req| req.alpha_mask) || !self.marquees.is_empty()
     }
 
     /// Whether the main island surface, rather than only a composition layer, needs a new frame.
@@ -1013,7 +1015,7 @@ impl Island {
         let launcher = (self.launcher_open() && self.launcher.interactive())
             || (self.menu_open() && self.menu.interactive())
             || (self.open == Some(Panel::Stack) && self.stack_panel.interactive());
-        self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || logo || launcher || self.text_running
+        self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || logo || launcher
     }
 
     pub fn wants_frames(&self) -> bool {
@@ -1195,20 +1197,33 @@ impl Island {
         if self.scroll.is_some() && self.scroller.is_none() {
             self.scroller = Some(scroller::Scroller::new(gfx)?);
         }
-        let fg = self.brushes.as_ref().map(|b| b.fg.clone());
         let hinted = self.texts.hinted.clone();
-        match (&self.scroll, self.scroller.as_mut(), &fg) {
-            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, fg, self.t, hinted.as_ref())?,
-            (None, Some(s), _) => s.hide()?,
+        match (&self.scroll, self.scroller.as_mut()) {
+            (Some(req), Some(s)) => s.show(gfx, req, self.t, hinted.as_ref())?,
+            (None, Some(s)) => s.hide()?,
             _ => {}
         }
         if self.panel_scroll.is_some() && self.panel_scroller.is_none() {
             self.panel_scroller = Some(scroller::Scroller::new(gfx)?);
         }
-        match (&self.panel_scroll, self.panel_scroller.as_mut(), &fg) {
-            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, fg, self.t, hinted.as_ref())?,
-            (None, Some(s), _) => s.hide()?,
+        match (&self.panel_scroll, self.panel_scroller.as_mut()) {
+            (Some(req), Some(s)) => s.show(gfx, req, self.t, hinted.as_ref())?,
+            (None, Some(s)) => s.hide()?,
             _ => {}
+        }
+        for (id, req) in &self.marquees {
+            if !self.marquee_layers.contains_key(id) {
+                self.marquee_layers.insert(id.clone(), scroller::Scroller::new(gfx)?);
+            }
+            if let Some(s) = self.marquee_layers.get_mut(id) {
+                s.show(gfx, req, self.t, hinted.as_ref())?;
+            }
+        }
+        let stale: Vec<String> = self.marquee_layers.keys().filter(|id| !self.marquees.iter().any(|(active, _)| active == *id)).cloned().collect();
+        for id in stale {
+            if let Some(s) = self.marquee_layers.remove(&id) {
+                s.remove(gfx)?;
+            }
         }
         Ok(())
     }
@@ -1216,6 +1231,7 @@ impl Island {
     fn draw_frame(&mut self, gfx: &Gfx, dc: &ID2D1DeviceContext, data: &Data) -> Result<()> {
         self.scroll = None;
         self.panel_scroll = None;
+        self.marquees.clear();
         if self.brushes.is_none() {
             self.brushes = Some(Brushes::new(dc, &self.theme)?);
         }
@@ -1323,8 +1339,8 @@ impl Island {
             t: self.t,
             scroll: &mut self.scroll,
             panel_scroll: &mut self.panel_scroll,
+            marquees: &mut self.marquees,
             app_icons: &mut self.app_icons,
-            running: std::cell::Cell::new(false),
         };
 
         // ── Layout ──
@@ -1489,7 +1505,6 @@ impl Island {
             res?;
         }
         access::draw_tip(&mut self.tip, &mut f, self.width, self.win_h, self.bottom)?;
-        self.text_running = f.running.get();
         // ── Border ──
         // The taskbar edge is erased under the dropdown and continued along its outline.
         if let (true, Some(brush), Some((_, edge_x)), Some(o), Some((panel, _))) =

@@ -398,6 +398,7 @@ impl PanelView for LauncherPanel {
                     *f.panel_scroll = Some(crate::island::scroller::Request {
                         key: item.name.clone(),
                         text: name,
+                        brush: fg.clone(),
                         l: name_x,
                         r: name_x + name_room,
                         cy: rcy,

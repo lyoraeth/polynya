@@ -32,10 +32,20 @@ const PAD_Y: f32 = 2.0;
 /// Duration for the left edge fade-in when scrolling starts, in seconds.
 const LEFT_FADE_IN: f32 = 0.25;
 
+fn color_key(brush: &ID2D1SolidColorBrush) -> [u32; 4] {
+    // SAFETY: reading a live brush's color has no preconditions.
+    let mut c = unsafe { brush.GetColor() };
+    // Cached glyphs are drawn at full opacity; the current alpha is applied during composition.
+    c.a = 0.0;
+    [c.r.to_bits(), c.g.to_bits(), c.b.to_bits(), c.a.to_bits()]
+}
+
 /// Request to show a scrolling text that doesn't fit in the lane `[l, r]` centered at `cy`.
 pub struct Request {
     pub key: String,
     pub text: Text,
+    /// Text color and opacity source for this particular lane.
+    pub brush: ID2D1SolidColorBrush,
     pub l: f32,
     pub r: f32,
     pub cy: f32,
@@ -60,11 +70,11 @@ pub struct Scroller {
     /// Surfaces are retained as long as the layer displays them.
     surfaces: Vec<IDCompositionSurface>,
     /// Cached text and lane width to avoid redundant redraws on a flat background.
-    painted: Option<(String, u32, [u32; 3])>,
+    painted: Option<(String, u32, [u32; 3], [u32; 4])>,
     /// Reused lane-sized surface for transparent masked frames.
     alpha_surface: Option<(u32, u32, IDCompositionSurface)>,
-    /// Both copies of the text, rasterized only when the track changes.
-    alpha_text: Option<(String, ID2D1Bitmap1)>,
+    /// Both copies of the text, rasterized only when its content or color changes.
+    alpha_text: Option<(String, [u32; 4], ID2D1Bitmap1)>,
     /// Gradient mask cached by lane width, opacity and left-edge fade state.
     alpha_gradient: Option<(u32, u32, u32, ID2D1LinearGradientBrush)>,
     /// Whether the last frame used the transparent mask path.
@@ -110,7 +120,7 @@ impl Scroller {
 
     /// Shows the scrolling text. Flat layers repaint only on content changes; transparent masked
     /// layers repaint their small lane on every frame. Changes are committed by the caller.
-    pub fn show(&mut self, gfx: &Gfx, req: &Request, fg: &ID2D1SolidColorBrush, t: f32, hinted: Option<&IDWriteRenderingParams>) -> Result<()> {
+    pub fn show(&mut self, gfx: &Gfx, req: &Request, t: f32, hinted: Option<&IDWriteRenderingParams>) -> Result<()> {
         let k = gfx.dpi / 96.0;
         let lane_w = req.r - req.l;
         let h = req.text.h + PAD_Y * 2.0;
@@ -127,12 +137,12 @@ impl Scroller {
             self.alpha_mode = Some(req.alpha_mask);
         }
         if req.alpha_mask {
-            self.paint_alpha(gfx, req, fg, lane_w, h, t, hinted)?;
+            self.paint_alpha(gfx, req, &req.brush, lane_w, h, t, hinted)?;
         } else {
-            // Background color is part of the key: wallpaper changes require edge recoloring.
-            let key = (req.key.clone(), lane_w.to_bits(), req.bg.map(f32::to_bits));
+            // Background and text colors are part of the key: look changes require repainting.
+            let key = (req.key.clone(), lane_w.to_bits(), req.bg.map(f32::to_bits), color_key(&req.brush));
             if self.painted.as_ref() != Some(&key) {
-                self.repaint(gfx, req, fg, lane_w, h)?;
+                self.repaint(gfx, req, &req.brush, lane_w, h)?;
                 self.painted = Some(key);
             }
         }
@@ -161,9 +171,19 @@ impl Scroller {
         Ok(())
     }
 
+    /// Removes a dynamically owned lane from the composition tree instead of leaking hidden visuals.
+    pub fn remove(mut self, gfx: &Gfx) -> Result<()> {
+        self.hide()?;
+        // SAFETY: `lane` is a live child of this root and is removed exactly once.
+        unsafe { gfx.root.RemoveVisual(&self.lane)? };
+        Ok(())
+    }
+
     fn text_for_alpha(&mut self, gfx: &Gfx, req: &Request, fg: &ID2D1SolidColorBrush, h: f32, hinted: Option<&IDWriteRenderingParams>) -> Result<ID2D1Bitmap1> {
-        if let Some((key, bitmap)) = &self.alpha_text
+        let color = color_key(fg);
+        if let Some((key, cached_color, bitmap)) = &self.alpha_text
             && key == &req.key
+            && cached_color == &color
         {
             return Ok(bitmap.clone());
         }
@@ -197,7 +217,7 @@ impl Scroller {
             end?;
             bitmap
         };
-        self.alpha_text = Some((req.key.clone(), bitmap.clone()));
+        self.alpha_text = Some((req.key.clone(), color, bitmap.clone()));
         Ok(bitmap)
     }
 

@@ -89,10 +89,11 @@ impl Segment for Weather {
                 tr.humidity,
                 wx.now.humidity
             );
-            let s = f.txt(&s, Font::Text, Style::Plain)?;
+            let text = s;
+            let s = f.txt(&text, Font::Text, Style::Plain)?;
             self.marquee = s.w > w;
             set_opacity(&dim, wh);
-            f.marquee(&s, x, x + w, cy, &dim, wh, hover.since, HOVER_MARQUEE_DELAY)?;
+            f.layered_marquee("weather:hover", &text, &s, x, x + w, cy, &dim, wh, hover.since, HOVER_MARQUEE_DELAY)?;
         }
         set_opacity(&fg, 1.0);
         set_opacity(&dim, 1.0);

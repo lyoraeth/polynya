@@ -171,10 +171,11 @@ impl Segment for Time {
         self.marquee = false;
         if let (Some(wx), true) = (data.weather, th > 0.0) {
             let tr = crate::i18n::t();
-            let s = f.txt(&format!("{} {} · {} {}", tr.sunrise, wx.sunrise, tr.sunset, wx.sunset), Font::Text, Style::Plain)?;
+            let text = format!("{} {} · {} {}", tr.sunrise, wx.sunrise, tr.sunset, wx.sunset);
+            let s = f.txt(&text, Font::Text, Style::Plain)?;
             self.marquee = s.w > w;
             set_opacity(&dim, th);
-            f.marquee(&s, x, x + w, cy, &dim, th, hover.since, HOVER_MARQUEE_DELAY)?;
+            f.layered_marquee("time:hover", &text, &s, x, x + w, cy, &dim, th, hover.since, HOVER_MARQUEE_DELAY)?;
         }
         set_opacity(&dim, 1.0);
         Ok(())

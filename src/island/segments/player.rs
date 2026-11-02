@@ -164,6 +164,7 @@ impl Segment for Player {
                 *f.scroll = Some(Request {
                     key: self.marquee_key.clone(),
                     text: title.clone(),
+                    brush: fg.clone(),
                     l,
                     r,
                     cy,

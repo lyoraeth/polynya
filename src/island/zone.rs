@@ -416,7 +416,7 @@ impl Zone {
             c.marquee = detail.w > room;
             if hov > 0.0 {
                 set_opacity(&fg, hov);
-                f.marquee(&detail, text_l, l + w - PAD, cy, &fg, hov, hover_since, HOVER_MARQUEE_DELAY)?;
+                f.layered_marquee(&format!("chip:{}", c.note.key), &c.note.body, &detail, text_l, l + w - PAD, cy, &fg, hov, hover_since, HOVER_MARQUEE_DELAY)?;
             }
         }
 
@@ -426,7 +426,8 @@ impl Zone {
             let hidden: Vec<&Note> = self.chips.iter().filter(|c| c.hidden && !c.leaving && !c.waiting).map(|c| &c.note).collect();
             let label = f.txt(&m.count.to_string(), Font::Small, Style::Tabular { case: false })?;
             let titles: Vec<String> = hidden.iter().map(|n| one_line(&n.title)).collect();
-            let detail = f.txt(&titles.join(" · "), Font::Text, Style::Plain)?;
+            let source = titles.join(" · ");
+            let detail = f.txt(&source, Font::Text, Style::Plain)?;
             let icons = hidden.len().min(STACK);
             let stack_w = if icons > 0 { STACK_D + STACK_STEP * (icons - 1) as f32 + STACK_GAP } else { 0.0 };
             let rest = PAD * 2.0 + stack_w + label.w;
@@ -458,7 +459,7 @@ impl Zone {
             m.marquee = detail.w > w - PAD * 2.0;
             if hov > 0.0 {
                 set_opacity(&fg, hov);
-                f.marquee(&detail, l + PAD, l + w - PAD, cy, &fg, hov, hover_since, HOVER_MARQUEE_DELAY)?;
+                f.layered_marquee("more", &source, &detail, l + PAD, l + w - PAD, cy, &fg, hov, hover_since, HOVER_MARQUEE_DELAY)?;
             }
         }
         set_opacity(&fg, 1.0);

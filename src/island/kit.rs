@@ -692,8 +692,8 @@ pub struct Frame<'a> {
     pub t: f32,
     pub scroll: &'a mut Option<super::scroller::Request>,
     pub panel_scroll: &'a mut Option<super::scroller::Request>,
+    pub marquees: &'a mut Vec<(String, super::scroller::Request)>,
     pub app_icons: &'a mut std::collections::HashMap<String, Option<windows::Win32::Graphics::Direct2D::ID2D1Bitmap1>>,
-    pub running: std::cell::Cell<bool>,
 }
 
 impl Frame<'_> {
@@ -755,61 +755,39 @@ impl Frame<'_> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn marquee(&self, text: &Text, l: f32, r: f32, cy: f32, brush: &ID2D1SolidColorBrush, alpha: f32, since: f32, delay: f32) -> Result<()> {
-        let dc = self.dc;
-        let y = cy - text.h / 2.0;
-        let room = r - l;
-        if text.w <= room {
-            draw_text(dc, text, l, y, brush);
+    pub fn layered_marquee(
+        &mut self,
+        id: &str,
+        source: &str,
+        text: &Text,
+        l: f32,
+        r: f32,
+        cy: f32,
+        brush: &ID2D1SolidColorBrush,
+        alpha: f32,
+        since: f32,
+        delay: f32,
+    ) -> Result<()> {
+        if text.w <= r - l {
+            draw_text(self.dc, text, l, cy - text.h / 2.0, brush);
             return Ok(());
         }
-        self.running.set(true);
-        let run = (self.t - since - delay).max(0.0);
-        let cycle = text.w + MARQUEE_GAP;
-        let off = (run * MARQUEE_SPEED) % cycle;
-        let left_fade = (run * 4.0).min(1.0);
-        // SAFETY: Direct2D calls on live COM objects; every argument is a value or a borrow that
-        // outlives the call.
-        unsafe {
-            let f = MARQUEE_FADE / room;
-            let coll = gradient(
-                dc,
-                &[
-                    D2D1_GRADIENT_STOP { position: 0.0, color: black(alpha * (1.0 - left_fade)) },
-                    D2D1_GRADIENT_STOP { position: f, color: black(alpha) },
-                    D2D1_GRADIENT_STOP { position: 1.0 - f, color: black(alpha) },
-                    D2D1_GRADIENT_STOP { position: 1.0, color: black(0.0) },
-                ],
-            )?;
-            let mask = dc.CreateLinearGradientBrush(
-                &D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES { startPoint: Vector2 { X: 0.0, Y: 0.0 }, endPoint: Vector2 { X: room, Y: 0.0 } },
-                None,
-                &coll,
-            )?;
-            mask.SetTransform(&Matrix3x2 { M11: 1.0, M12: 0.0, M21: 0.0, M22: 1.0, M31: l, M32: 0.0 });
-            let params = D2D1_LAYER_PARAMETERS1 {
-                contentBounds: D2D_RECT_F { left: l, top: y - 2.0, right: r, bottom: y + text.h + 2.0 },
-                geometricMask: std::mem::ManuallyDrop::new(None),
-                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                maskTransform: Matrix3x2::identity(),
-                opacity: 1.0,
-                opacityBrush: std::mem::ManuallyDrop::new(Some(mask.cast()?)),
-                layerOptions: D2D1_LAYER_OPTIONS1_NONE,
-            };
-            brush.SetOpacity(1.0);
-            dc.PushLayer(&params, None);
-            if self.texts.hinted.is_some() {
-                dc.SetTextRenderingParams(None);
-            }
-            draw_text(dc, text, l - off, y, brush);
-            draw_text(dc, text, l - off + cycle, y, brush);
-            if let Some(p) = &self.texts.hinted {
-                dc.SetTextRenderingParams(p);
-            }
-            dc.PopLayer();
-            drop(std::mem::ManuallyDrop::into_inner(params.opacityBrush));
-            brush.SetOpacity(alpha);
-        }
+        self.marquees.push((
+            id.into(),
+            super::scroller::Request {
+                key: source.into(),
+                text: text.clone(),
+                brush: brush.clone(),
+                l,
+                r,
+                cy,
+                alpha,
+                delay,
+                since,
+                bg: self.backdrop,
+                alpha_mask: true,
+            },
+        ));
         Ok(())
     }
 
