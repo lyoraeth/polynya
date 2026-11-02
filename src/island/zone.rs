@@ -120,8 +120,6 @@ pub struct Zone {
 struct More {
     count: usize,
     shown: f32,
-    hov: f32,
-    marquee: bool,
 }
 
 /// Collapses multiline text into a single line separated by " · " for chips and stacks.
@@ -319,8 +317,6 @@ impl Zone {
         }
         self.chips.retain(|c| !(c.leaving && (c.shown <= 0.0 || c.hidden || c.waiting)));
         let more = &mut self.more;
-        let more_hover = hover == Some(Part::More) && open != Some(Part::More);
-        moving |= tween(&mut more.hov, if more_hover { 1.0 } else { 0.0 }, dt / fade);
         let hidden = self.chips.iter().filter(|c| c.hidden && !c.leaving && !c.waiting).count();
         if hidden > 0 {
             more.count = hidden;
@@ -330,8 +326,7 @@ impl Zone {
     }
 
     pub fn wants_frames(&self) -> bool {
-        let more = (self.more.hov > 0.0 && self.more.marquee)
-            || self.more.shown != if self.chips.iter().any(|c| c.hidden && !c.leaving && !c.waiting) { 1.0 } else { 0.0 };
+        let more = self.more.shown != if self.chips.iter().any(|c| c.hidden && !c.leaving && !c.waiting) { 1.0 } else { 0.0 };
         let chips = self.chips.iter().filter(|c| !c.hidden && !c.waiting).any(|c| (c.hov > 0.0 && c.marquee) || c.shown != if c.leaving { 0.0 } else { 1.0 });
         more || chips
     }
@@ -425,17 +420,14 @@ impl Zone {
         if m.shown > 0.0 {
             let hidden: Vec<&Note> = self.chips.iter().filter(|c| c.hidden && !c.leaving && !c.waiting).map(|c| &c.note).collect();
             let label = f.txt(&m.count.to_string(), Font::Small, Style::Tabular { case: false })?;
-            let titles: Vec<String> = hidden.iter().map(|n| one_line(&n.title)).collect();
-            let source = titles.join(" · ");
-            let detail = f.txt(&source, Font::Text, Style::Plain)?;
             let icons = hidden.len().min(STACK);
             let stack_w = if icons > 0 { STACK_D + STACK_STEP * (icons - 1) as f32 + STACK_GAP } else { 0.0 };
             let rest = PAD * 2.0 + stack_w + label.w;
-            let w = rest + (MAX_W.max(rest) - rest) * ease_in_out(m.hov);
+            let w = rest;
             let a = ease_out_cubic(m.shown);
             let l = x + -ENTER_SHIFT * (1.0 - a);
             self.rects.push((Part::More, (l, top, l + w, bottom)));
-            let (def, hov) = (a * (1.0 - m.hov), a * m.hov);
+            let def = a;
             if def > 0.0 {
                 let plate = br.plate.clone();
                 for (i, n) in hidden.iter().take(icons).enumerate().rev() {
@@ -455,11 +447,6 @@ impl Zone {
                 set_opacity(&dim, def);
                 draw_text(f.dc, &label, l + PAD + stack_w, cy - label.h / 2.0, &dim);
                 set_opacity(&dim, 1.0);
-            }
-            m.marquee = detail.w > w - PAD * 2.0;
-            if hov > 0.0 {
-                set_opacity(&fg, hov);
-                f.layered_marquee("more", &source, &detail, l + PAD, l + w - PAD, cy, &fg, hov, hover_since, HOVER_MARQUEE_DELAY)?;
             }
         }
         set_opacity(&fg, 1.0);
