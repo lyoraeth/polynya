@@ -398,6 +398,8 @@ pub struct Island {
     search: Rect,
     scroller: Option<scroller::Scroller>,
     scroll: Option<scroller::Request>,
+    panel_scroller: Option<scroller::Scroller>,
+    panel_scroll: Option<scroller::Request>,
     hotspots: Vec<Hotspot>,
     /// Texts cut to fit in the last frame, see `Frame::cut`.
     cut: Vec<(Rect, String)>,
@@ -509,6 +511,8 @@ impl Island {
             search: (c, INSET, c, h - INSET),
             scroller: None,
             scroll: None,
+            panel_scroller: None,
+            panel_scroll: None,
             hotspots: Vec::new(),
             cut: Vec::new(),
         })
@@ -1000,7 +1004,7 @@ impl Island {
 
     /// Whether only the transparent composition layer needs monitor-rate frames.
     pub fn layer_frames(&self) -> bool {
-        self.scroll.as_ref().is_some_and(|req| req.alpha_mask)
+        [self.scroll.as_ref(), self.panel_scroll.as_ref()].into_iter().flatten().any(|req| req.alpha_mask)
     }
 
     /// Whether the main island surface, rather than only a composition layer, needs a new frame.
@@ -1193,8 +1197,16 @@ impl Island {
         }
         let fg = self.brushes.as_ref().map(|b| b.fg.clone());
         let hinted = self.texts.hinted.clone();
-        match (&self.scroll, self.scroller.as_mut(), fg) {
-            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, &fg, self.t, hinted.as_ref())?,
+        match (&self.scroll, self.scroller.as_mut(), &fg) {
+            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, fg, self.t, hinted.as_ref())?,
+            (None, Some(s), _) => s.hide()?,
+            _ => {}
+        }
+        if self.panel_scroll.is_some() && self.panel_scroller.is_none() {
+            self.panel_scroller = Some(scroller::Scroller::new(gfx)?);
+        }
+        match (&self.panel_scroll, self.panel_scroller.as_mut(), &fg) {
+            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, fg, self.t, hinted.as_ref())?,
             (None, Some(s), _) => s.hide()?,
             _ => {}
         }
@@ -1203,6 +1215,7 @@ impl Island {
 
     fn draw_frame(&mut self, gfx: &Gfx, dc: &ID2D1DeviceContext, data: &Data) -> Result<()> {
         self.scroll = None;
+        self.panel_scroll = None;
         if self.brushes.is_none() {
             self.brushes = Some(Brushes::new(dc, &self.theme)?);
         }
@@ -1309,6 +1322,7 @@ impl Island {
             mouse: self.mouse,
             t: self.t,
             scroll: &mut self.scroll,
+            panel_scroll: &mut self.panel_scroll,
             app_icons: &mut self.app_icons,
             running: std::cell::Cell::new(false),
         };

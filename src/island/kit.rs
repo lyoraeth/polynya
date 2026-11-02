@@ -691,6 +691,7 @@ pub struct Frame<'a> {
     pub mouse: Option<(f32, f32)>,
     pub t: f32,
     pub scroll: &'a mut Option<super::scroller::Request>,
+    pub panel_scroll: &'a mut Option<super::scroller::Request>,
     pub app_icons: &'a mut std::collections::HashMap<String, Option<windows::Win32::Graphics::Direct2D::ID2D1Bitmap1>>,
     pub running: std::cell::Cell<bool>,
 }

@@ -392,7 +392,22 @@ impl PanelView for LauncherPanel {
             // Long names: marquee for selected, ellipsis for others.
             if lit == *row {
                 let name = f.txt(&item.name, Font::Text, Style::Plain)?;
-                f.marquee(&name, name_x, name_x + name_room, rcy, &fg, a, lit_since, NAME_MARQUEE_DELAY)?;
+                if name.w <= name_room {
+                    draw_text(f.dc, &name, name_x, rcy - name.h / 2.0, &fg);
+                } else {
+                    *f.panel_scroll = Some(crate::island::scroller::Request {
+                        key: item.name.clone(),
+                        text: name,
+                        l: name_x,
+                        r: name_x + name_room,
+                        cy: rcy,
+                        alpha: a,
+                        delay: NAME_MARQUEE_DELAY,
+                        since: lit_since,
+                        bg: f.backdrop,
+                        alpha_mask: true,
+                    });
+                }
             } else {
                 let name = f.txt(&item.name, Font::Text, Style::trim(name_room))?;
                 draw_text(f.dc, &name, name_x, rcy - name.h / 2.0, &fg);
