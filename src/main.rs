@@ -225,6 +225,8 @@ struct App {
     menu_restore: bool,
     /// When to draw the next background frame; `None` means now (an animation is running).
     next_frame: Option<Instant>,
+    /// An external event needs one main-surface frame before layer-only rendering can resume.
+    main_dirty: bool,
 }
 
 thread_local! {
@@ -523,6 +525,7 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
                 invoking: None,
                 menu_restore: false,
                 next_frame: None,
+                main_dirty: true,
             })
         });
         let _ = windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification(hwnd, windows::Win32::System::RemoteDesktop::NOTIFY_FOR_THIS_SESSION);
@@ -552,7 +555,7 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
             // Messages that arrived while there was no window.
             a.apply_pushes();
             a.sync_note_timer();
-            a.render();
+            a.render(true);
         });
         SetTimer(Some(hwnd), TIMER_CLOCK, 1000, None);
         Ok(())
@@ -960,26 +963,29 @@ impl App {
         self.island.set_frame(self.bottom, px as f32 / self.scale);
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, main: bool) {
         if self.broken {
             return;
         }
-        self.fit_window();
-        let free = taskbar::free().map(|(l, r)| ((l - self.left_px) as f32 / self.scale, (r - self.left_px) as f32 / self.scale));
-        self.island.set_free(free);
-        let snap = media_snapshot();
-        let wx = weather::current();
-        let drawn = {
+        self.main_dirty = false;
+        let drawn = if main {
+            self.fit_window();
+            let free = taskbar::free().map(|(l, r)| ((l - self.left_px) as f32 / self.scale, (r - self.left_px) as f32 / self.scale));
+            self.island.set_free(free);
+            let snap = media_snapshot();
+            let wx = weather::current();
             let (island, gfx) = (&mut self.island, &self.gfx);
             gfx.frame(|dc| {
                 if let Err(e) = island.draw(gfx, dc, &snap, wx.as_ref()) {
                     proto::error!("gfx", "draw: {e}");
                 }
             })
+        } else {
+            Ok(())
         };
         // The region goes before the frame is shown and with its own size: set afterwards, it lagged a
         // frame and clipped the growing dropdown (on expand and on spring overshoot).
-        if drawn.is_ok() {
+        if main && drawn.is_ok() {
             self.update_region();
             if a11y::active() {
                 a11y::stage(self.hwnd, self.island.access(), self.scale);
@@ -1323,6 +1329,7 @@ impl App {
     /// Redraw on an external event. If the island needs continuous frames (visualizer, marquee), starts
     /// the frame loop instead of a one-off draw.
     fn refresh(&mut self) {
+        self.main_dirty = true;
         if self.animating || HIDDEN.load(Ordering::Relaxed) {
             return;
         }
@@ -1331,7 +1338,7 @@ impl App {
         if self.island.sync_launcher() || self.island.wants_frames() {
             self.animate();
         } else {
-            self.render();
+            self.render(true);
         }
     }
 
@@ -1347,19 +1354,21 @@ impl App {
         let moving = self.island.step(dt);
         // A notification may have expanded by itself; a click outside must close it.
         self.sync_hook();
-        self.animating = moving || self.island.wants_frames();
+        let monitor_rate = moving || self.island.layer_frames();
+        self.animating = monitor_rate || self.island.wants_frames();
         // Hover and expansion pause and rearm notification deadlines.
         if !self.animating {
             self.sync_note_timer();
         }
-        // Animations run at the monitor rate; background frames less often, on a timer: motion there is
-        // slow, and every frame costs CPU.
-        self.next_frame = (!moving && self.animating).then(|| now + BACKGROUND_FRAME);
-        self.render();
+        // Interactive motion and transparent layers run at the monitor rate; background frames less often.
+        self.next_frame = (!monitor_rate && self.animating).then(|| now + BACKGROUND_FRAME);
+        let main = self.main_dirty || moving || self.island.wants_main_frames();
+        self.render(main);
     }
 
     fn animate(&mut self) {
         // An event (hover, click) responds at once, without waiting for the background frame.
+        self.main_dirty = true;
         self.next_frame = None;
         if !self.animating {
             self.last = Instant::now();

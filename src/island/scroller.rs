@@ -1,26 +1,28 @@
 // Copyright (c) Danil Klimov (lyoraeth)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! DirectComposition marquee: text is rendered once into a separate layer, and the
-//! composition engine handles the scrolling. The island avoids per-frame rendering
-//! for long track titles.
+//! DirectComposition marquee on flat backgrounds: text is rendered once and DWM shifts it.
+//! On glass, a lane-sized transparent layer redraws the same alpha-masked text as the main renderer,
+//! so no approximate copy of the panel background is needed.
 //!
 //! Layer structure: a clipped lane with global opacity (for hover transitions),
-//! containing a surface with text rendered twice with a gap. The composition
-//! animation shifts this surface. Edge fading uses gradients matching the pill color.
-//! The left edge fades in only when scrolling starts, ensuring readability at rest.
+//! containing a surface with text rendered twice with a gap. On flat backgrounds, edge fading uses
+//! gradients matching the pill color. The left edge fades in only when scrolling starts.
 
 use windows::{
     Win32::Graphics::{
         Direct2D::{
-            Common::{D2D_RECT_F, D2D1_COLOR_F, D2D1_GRADIENT_STOP},
-            D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES, ID2D1SolidColorBrush,
+            Common::{D2D_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT},
+            D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_BITMAP_OPTIONS_TARGET, D2D1_BITMAP_PROPERTIES1, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_LAYER_OPTIONS1_NONE,
+            D2D1_LAYER_PARAMETERS1, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES, ID2D1Bitmap1, ID2D1LinearGradientBrush, ID2D1SolidColorBrush,
         },
         DirectComposition::{DCOMPOSITION_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, IDCompositionEffectGroup, IDCompositionSurface, IDCompositionVisual},
+        DirectWrite::IDWriteRenderingParams,
+        Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM,
     },
-    core::Result,
+    core::{Interface, Result},
 };
-use windows_numerics::Vector2;
+use windows_numerics::{Matrix3x2, Vector2};
 
 use super::kit::{MARQUEE_FADE, MARQUEE_GAP, MARQUEE_SPEED, Text, draw_text, gradient};
 use crate::gfx::Gfx;
@@ -40,8 +42,12 @@ pub struct Request {
     pub alpha: f32,
     /// Delay before scrolling starts, in seconds.
     pub delay: f32,
+    /// Start time used by the transparent software-masked layer.
+    pub since: f32,
     /// Background color under the text, used for edge fading.
     pub bg: [f32; 3],
+    /// Draw with an alpha mask instead of opaque edge fades on glass.
+    pub alpha_mask: bool,
 }
 
 pub struct Scroller {
@@ -53,8 +59,16 @@ pub struct Scroller {
     left_opacity: IDCompositionEffectGroup,
     /// Surfaces are retained as long as the layer displays them.
     surfaces: Vec<IDCompositionSurface>,
-    /// Cached text and lane width to avoid redundant redraws.
+    /// Cached text and lane width to avoid redundant redraws on a flat background.
     painted: Option<(String, u32, [u32; 3])>,
+    /// Reused lane-sized surface for transparent masked frames.
+    alpha_surface: Option<(u32, u32, IDCompositionSurface)>,
+    /// Both copies of the text, rasterized only when the track changes.
+    alpha_text: Option<(String, ID2D1Bitmap1)>,
+    /// Gradient mask cached by lane width, opacity and left-edge fade state.
+    alpha_gradient: Option<(u32, u32, u32, ID2D1LinearGradientBrush)>,
+    /// Whether the last frame used the transparent mask path.
+    alpha_mode: Option<bool>,
     /// Last applied offset and opacity to avoid redundant composition calls.
     placed: Option<(f32, f32, f32)>,
 }
@@ -76,27 +90,58 @@ impl Scroller {
             let left_opacity = d.CreateEffectGroup()?;
             fade_l.SetEffect(&left_opacity)?;
             gfx.root.AddVisual(&lane, true, None::<&IDCompositionVisual>)?;
-            Ok(Self { lane, text, fade_l, fade_r, opacity, left_opacity, surfaces: Vec::new(), painted: None, placed: None })
+            Ok(Self {
+                lane,
+                text,
+                fade_l,
+                fade_r,
+                opacity,
+                left_opacity,
+                surfaces: Vec::new(),
+                painted: None,
+                alpha_surface: None,
+                alpha_text: None,
+                alpha_gradient: None,
+                alpha_mode: None,
+                placed: None,
+            })
         }
     }
 
-    /// Shows the scrolling text. Redraws the layer and restarts the animation only if
-    /// the text or lane width has changed. Changes are committed to the composition
-    /// engine on the next frame.
-    pub fn show(&mut self, gfx: &Gfx, req: &Request, fg: &ID2D1SolidColorBrush) -> Result<()> {
+    /// Shows the scrolling text. Flat layers repaint only on content changes; transparent masked
+    /// layers repaint their small lane on every frame. Changes are committed by the caller.
+    pub fn show(&mut self, gfx: &Gfx, req: &Request, fg: &ID2D1SolidColorBrush, t: f32, hinted: Option<&IDWriteRenderingParams>) -> Result<()> {
         let k = gfx.dpi / 96.0;
         let lane_w = req.r - req.l;
         let h = req.text.h + PAD_Y * 2.0;
-        // Background color is part of the key: wallpaper changes require edge recoloring.
-        let key = (req.key.clone(), lane_w.to_bits(), req.bg.map(f32::to_bits));
-        if self.painted.as_ref() != Some(&key) {
-            self.repaint(gfx, req, fg, lane_w, h)?;
-            self.painted = Some(key);
+        if self.alpha_mode != Some(req.alpha_mask) {
+            // SAFETY: DirectComposition calls on live objects; every argument outlives its call.
+            unsafe {
+                if req.alpha_mask {
+                    self.fade_l.SetContent(None::<&windows::core::IUnknown>)?;
+                    self.fade_r.SetContent(None::<&windows::core::IUnknown>)?;
+                    self.text.SetOffsetX2(0.0)?;
+                }
+            }
+            self.painted = None;
+            self.alpha_mode = Some(req.alpha_mask);
         }
-        // Lane must be aligned to integer pixels to prevent text blurring.
-        let place = ((req.l * k).round(), ((req.cy - h / 2.0) * k).round(), req.alpha);
+        if req.alpha_mask {
+            self.paint_alpha(gfx, req, fg, lane_w, h, t, hinted)?;
+        } else {
+            // Background color is part of the key: wallpaper changes require edge recoloring.
+            let key = (req.key.clone(), lane_w.to_bits(), req.bg.map(f32::to_bits));
+            if self.painted.as_ref() != Some(&key) {
+                self.repaint(gfx, req, fg, lane_w, h)?;
+                self.painted = Some(key);
+            }
+        }
+        // Lane must be aligned to integer pixels to prevent text blurring. The masked path applies
+        // opacity to the text itself rather than to the whole lane.
+        let opacity = if req.alpha_mask { 1.0 } else { req.alpha };
+        let place = ((req.l * k).round(), ((req.cy - h / 2.0) * k).round(), opacity);
         if self.placed != Some(place) {
-            // SAFETY: DirectComposition calls on live objects; every argument outlives the call.
+            // SAFETY: DirectComposition calls on live objects; every argument outlives its call.
             unsafe {
                 self.lane.SetOffsetX2(place.0)?;
                 self.lane.SetOffsetY2(place.1)?;
@@ -112,6 +157,124 @@ impl Scroller {
             // SAFETY: DirectComposition calls on live objects; every argument outlives the call.
             unsafe { self.opacity.SetOpacity2(0.0)? };
             self.placed = None;
+        }
+        Ok(())
+    }
+
+    fn text_for_alpha(&mut self, gfx: &Gfx, req: &Request, fg: &ID2D1SolidColorBrush, h: f32, hinted: Option<&IDWriteRenderingParams>) -> Result<ID2D1Bitmap1> {
+        if let Some((key, bitmap)) = &self.alpha_text
+            && key == &req.key
+        {
+            return Ok(bitmap.clone());
+        }
+        let k = gfx.dpi / 96.0;
+        let cycle = req.text.w + MARQUEE_GAP;
+        let props = D2D1_BITMAP_PROPERTIES1 {
+            pixelFormat: D2D1_PIXEL_FORMAT { format: DXGI_FORMAT_B8G8R8A8_UNORM, alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED },
+            dpiX: gfx.dpi,
+            dpiY: gfx.dpi,
+            bitmapOptions: D2D1_BITMAP_OPTIONS_TARGET,
+            ..Default::default()
+        };
+        // SAFETY: Direct2D calls use live objects owned by `gfx`; the bitmap target is cleared and
+        // released on every path after `BeginDraw`, and text parameters are restored before reuse.
+        let bitmap = unsafe {
+            let bitmap = gfx.dc.CreateBitmap(D2D_SIZE_U { width: ((cycle + req.text.w) * k).ceil() as u32, height: (h * k).ceil() as u32 }, None, 0, &props)?;
+            gfx.dc.SetTarget(&bitmap);
+            gfx.dc.BeginDraw();
+            gfx.dc.Clear(Some(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }));
+            fg.SetOpacity(1.0);
+            if hinted.is_some() {
+                gfx.dc.SetTextRenderingParams(None);
+            }
+            draw_text(&gfx.dc, &req.text, 0.0, PAD_Y, fg);
+            draw_text(&gfx.dc, &req.text, cycle, PAD_Y, fg);
+            if let Some(params) = hinted {
+                gfx.dc.SetTextRenderingParams(Some(params));
+            }
+            let end = gfx.dc.EndDraw(None, None);
+            gfx.dc.SetTarget(None);
+            end?;
+            bitmap
+        };
+        self.alpha_text = Some((req.key.clone(), bitmap.clone()));
+        Ok(bitmap)
+    }
+
+    fn mask_for_alpha(&mut self, gfx: &Gfx, lane_w: f32, alpha: f32, left_fade: f32) -> Result<ID2D1LinearGradientBrush> {
+        let key = (lane_w.to_bits(), alpha.to_bits(), left_fade.to_bits());
+        if let Some((w, a, left, mask)) = &self.alpha_gradient
+            && (*w, *a, *left) == key
+        {
+            return Ok(mask.clone());
+        }
+        let f = MARQUEE_FADE / lane_w;
+        let black = |a| D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a };
+        let coll = gradient(
+            &gfx.dc,
+            &[
+                D2D1_GRADIENT_STOP { position: 0.0, color: black(alpha * (1.0 - left_fade)) },
+                D2D1_GRADIENT_STOP { position: f, color: black(alpha) },
+                D2D1_GRADIENT_STOP { position: 1.0 - f, color: black(alpha) },
+                D2D1_GRADIENT_STOP { position: 1.0, color: black(0.0) },
+            ],
+        )?;
+        let props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES { startPoint: Vector2 { X: 0.0, Y: 0.0 }, endPoint: Vector2 { X: lane_w, Y: 0.0 } };
+        // SAFETY: the device context and gradient collection are alive for this call.
+        let mask = unsafe { gfx.dc.CreateLinearGradientBrush(&props, None, &coll)? };
+        self.alpha_gradient = Some((key.0, key.1, key.2, mask.clone()));
+        Ok(mask)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn paint_alpha(
+        &mut self,
+        gfx: &Gfx,
+        req: &Request,
+        fg: &ID2D1SolidColorBrush,
+        lane_w: f32,
+        h: f32,
+        t: f32,
+        hinted: Option<&IDWriteRenderingParams>,
+    ) -> Result<()> {
+        let key = (lane_w.to_bits(), h.to_bits());
+        if self.alpha_surface.as_ref().is_none_or(|(w, h, _)| (*w, *h) != key) {
+            let (surface, _) = gfx.layer_surface(lane_w, h)?;
+            self.alpha_surface = Some((key.0, key.1, surface));
+        }
+        let surface = self.alpha_surface.as_ref().map(|(_, _, surface)| surface.clone()).unwrap();
+        let bitmap = self.text_for_alpha(gfx, req, fg, h, hinted)?;
+        let k = gfx.dpi / 96.0;
+        let px = (((lane_w * k).ceil() as u32).max(1), ((h * k).ceil() as u32).max(1));
+        let cycle = req.text.w + MARQUEE_GAP;
+        let run = (t - req.since - req.delay).max(0.0);
+        let off = (run * MARQUEE_SPEED) % cycle;
+        let left_fade = (run * 4.0).min(1.0);
+        let mask = self.mask_for_alpha(gfx, lane_w, req.alpha, left_fade)?;
+        let bitmap_w = cycle + req.text.w;
+        // SAFETY: Direct2D calls on live COM objects; the layer and its opacity brush are paired.
+        gfx.paint(&surface, px, |dc| unsafe {
+            let Ok(mask) = mask.cast() else { return };
+            let rect = D2D_RECT_F { left: 0.0, top: 0.0, right: lane_w, bottom: h };
+            let params = D2D1_LAYER_PARAMETERS1 {
+                contentBounds: rect,
+                geometricMask: std::mem::ManuallyDrop::new(None),
+                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                maskTransform: Matrix3x2::identity(),
+                opacity: 1.0,
+                opacityBrush: std::mem::ManuallyDrop::new(Some(mask)),
+                layerOptions: D2D1_LAYER_OPTIONS1_NONE,
+            };
+            dc.PushLayer(&params, None);
+            let text_rect = D2D_RECT_F { left: -off, top: 0.0, right: bitmap_w - off, bottom: h };
+            dc.DrawBitmap(&bitmap, Some(&text_rect), req.alpha, D2D1_INTERPOLATION_MODE_LINEAR, None, None);
+            dc.PopLayer();
+            drop(std::mem::ManuallyDrop::into_inner(params.opacityBrush));
+        })?;
+        // SAFETY: DirectComposition calls on live objects; every argument outlives its call.
+        unsafe {
+            self.text.SetContent(&surface)?;
+            self.lane.SetClip2(&D2D_RECT_F { left: 0.0, top: 0.0, right: (lane_w * k).round(), bottom: (h * k).round() })?;
         }
         Ok(())
     }

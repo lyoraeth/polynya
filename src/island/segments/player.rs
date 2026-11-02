@@ -159,16 +159,21 @@ impl Segment for Player {
                 }
             }
             let (l, r) = (x + VIZ_W + TITLE_GAP, x + w);
-            if self.overflow && f.glass {
-                // On glass the background under the title is uneven: solid edges of the composition layer
-                // showed as rectangles, so the edges fade with a mask, at the cost of frames while
-                // it scrolls.
+            if self.overflow {
                 set_opacity(&fg, 1.0 - hov);
-                f.marquee(&title, l, r, cy, &fg, 1.0 - hov, self.marquee_since, MARQUEE_DELAY)?;
+                *f.scroll = Some(Request {
+                    key: self.marquee_key.clone(),
+                    text: title.clone(),
+                    l,
+                    r,
+                    cy,
+                    alpha: 1.0 - hov,
+                    delay: MARQUEE_DELAY,
+                    since: self.marquee_since,
+                    bg: f.backdrop,
+                    alpha_mask: f.glass,
+                });
                 set_opacity(&fg, 1.0);
-            } else if self.overflow {
-                *f.scroll =
-                    Some(Request { key: self.marquee_key.clone(), text: title.clone(), l, r, cy, alpha: 1.0 - hov, delay: MARQUEE_DELAY, bg: f.backdrop });
             } else {
                 draw_text(f.dc, &title, l, cy - title.h / 2.0, &fg);
             }

@@ -998,12 +998,22 @@ impl Island {
         segments || (self.playing && self.shown == Some(Panel::Player))
     }
 
-    pub fn wants_frames(&self) -> bool {
+    /// Whether only the transparent composition layer needs monitor-rate frames.
+    pub fn layer_frames(&self) -> bool {
+        self.scroll.as_ref().is_some_and(|req| req.alpha_mask)
+    }
+
+    /// Whether the main island surface, rather than only a composition layer, needs a new frame.
+    pub fn wants_main_frames(&self) -> bool {
         let logo = self.zone.shows(logo::Anim::Dots);
         let launcher = (self.launcher_open() && self.launcher.interactive())
             || (self.menu_open() && self.menu.moving())
             || (self.open == Some(Panel::Stack) && self.stack_panel.interactive());
         self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || logo || launcher || self.text_running
+    }
+
+    pub fn wants_frames(&self) -> bool {
+        self.wants_main_frames() || self.layer_frames()
     }
 
     pub fn mouse_move(&mut self, x: f32, y: f32) -> bool {
@@ -1178,26 +1188,21 @@ impl Island {
     }
 
     pub fn draw_layers(&mut self, gfx: &Gfx) -> Result<()> {
-        match self.scroll.take() {
-            Some(req) => {
-                if self.scroller.is_none() {
-                    self.scroller = Some(scroller::Scroller::new(gfx)?);
-                }
-                let fg = self.brushes.as_ref().map(|b| b.fg.clone());
-                if let (Some(s), Some(fg)) = (self.scroller.as_mut(), fg) {
-                    s.show(gfx, &req, &fg)?;
-                }
-            }
-            None => {
-                if let Some(s) = self.scroller.as_mut() {
-                    s.hide()?;
-                }
-            }
+        if self.scroll.is_some() && self.scroller.is_none() {
+            self.scroller = Some(scroller::Scroller::new(gfx)?);
+        }
+        let fg = self.brushes.as_ref().map(|b| b.fg.clone());
+        let hinted = self.texts.hinted.clone();
+        match (&self.scroll, self.scroller.as_mut(), fg) {
+            (Some(req), Some(s), Some(fg)) => s.show(gfx, req, &fg, self.t, hinted.as_ref())?,
+            (None, Some(s), _) => s.hide()?,
+            _ => {}
         }
         Ok(())
     }
 
     fn draw_frame(&mut self, gfx: &Gfx, dc: &ID2D1DeviceContext, data: &Data) -> Result<()> {
+        self.scroll = None;
         if self.brushes.is_none() {
             self.brushes = Some(Brushes::new(dc, &self.theme)?);
         }
