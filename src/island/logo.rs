@@ -4,9 +4,8 @@
 //! Notification icons, including "agent thinking" animations.
 //!
 //! Corporate logos are not drawn due to trademark restrictions.
-//! Claude Code is identified by its terminal indicator glyphs (Unicode), cycling at 8 Hz.
-//! Other agents use the Polynya mark: three stripes with a gradient. "Thinking" animates
-//! via 60° snap rotations. The mark is 60° symmetric, making the loop seamless.
+//! Animated agents are identified by terminal indicator glyphs (Unicode), cycling at 8 Hz.
+//! The static Polynya mark remains available for non-animated agent notifications.
 //! Time is sourced from process start, not island clocks, to ensure glyph changes
 //! occur even during one-off redraws.
 
@@ -41,11 +40,10 @@ const MARK_MOVE: f32 = 0.45;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Anim {
     Glyph,
-    Dots,
 }
 
 pub fn anim(note: &Note) -> Option<Anim> {
-    note.animated.then_some(if note.icon == Icon::Claude { Anim::Glyph } else { Anim::Dots })
+    note.animated.then_some(Anim::Glyph)
 }
 
 fn now() -> f32 {
@@ -78,7 +76,6 @@ pub fn note_icon(f: &mut Frame, note: &Note, cx: f32, cy: f32, size: f32, alpha:
             let step = (now() * GLYPH_RATE) as usize % period;
             glyph(f, GLYPHS[if step < n { step } else { period - step }], cx, cy, size, alpha)
         }
-        (Some(Anim::Dots), _) => mark(f, now(), cx, cy, size, alpha),
         (None, Icon::Claude) => glyph(f, GLYPH_REST, cx, cy, size, alpha),
         (None, Icon::Agent) => mark(f, 0.0, cx, cy, size, alpha),
         (None, Icon::Color([r, g, b])) => {

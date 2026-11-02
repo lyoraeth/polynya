@@ -1011,11 +1011,10 @@ impl Island {
 
     /// Whether the main island surface, rather than only a composition layer, needs a new frame.
     pub fn wants_main_frames(&self) -> bool {
-        let logo = self.zone.shows(logo::Anim::Dots);
         let launcher = (self.launcher_open() && self.launcher.interactive())
             || (self.menu_open() && self.menu.interactive())
             || (self.open == Some(Panel::Stack) && self.stack_panel.interactive());
-        self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || logo || launcher
+        self.segments.iter().zip(&self.hov).any(|(s, h)| s.wants_frames(*h)) || self.zone.wants_frames() || launcher
     }
 
     pub fn wants_frames(&self) -> bool {
