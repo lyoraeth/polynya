@@ -88,6 +88,7 @@ pub enum Action {
     LaunchAct(usize),
     Swatch(usize),
     OpenApp(Part),
+    OpenLink(Part),
     ImagePreview(usize),
     MenuRow(usize),
     MenuBack,
@@ -851,6 +852,14 @@ impl Island {
         self.zone.note(part)?.app.clone()
     }
 
+    pub fn note_link(&self, part: Part) -> Option<String> {
+        self.zone.note(part)?.link.clone()
+    }
+
+    pub fn arm_visible_note(&mut self, key: &str, ttl: std::time::Duration) -> bool {
+        self.zone.arm_visible_note(key, ttl)
+    }
+
     pub fn note_image(&self) -> Option<proto::ImageRef> {
         self.zone.note(self.open_part?)?.image.clone().filter(|image| image.preview)
     }
@@ -1117,6 +1126,7 @@ impl Island {
                 HotKind::LaunchAct(j) => Action::LaunchAct(j),
                 HotKind::Swatch(i) => Action::Swatch(i),
                 HotKind::OpenApp => self.open_part.map_or(Action::None, Action::OpenApp),
+                HotKind::OpenLink => self.open_part.map_or(Action::None, Action::OpenLink),
                 HotKind::ImagePreview(i) => Action::ImagePreview(i),
                 HotKind::MenuRow(i) => Action::MenuRow(i),
                 HotKind::MenuBack => Action::MenuBack,
@@ -1128,6 +1138,7 @@ impl Island {
             };
         }
         match self.hit(x, y) {
+            Hit::Part(p @ Part::Note(_)) if self.zone.note(p).is_some_and(|n| n.link.is_some()) => Action::OpenLink(p),
             Hit::Part(p @ Part::Note(_)) if self.zone.note(p).is_some_and(|n| n.app.is_some()) => Action::OpenApp(p),
             Hit::Part(p @ Part::Note(_)) => Action::Open(Panel::Note, p),
             Hit::Part(Part::More) => Action::Open(Panel::Stack, Part::More),

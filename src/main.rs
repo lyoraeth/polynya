@@ -14,6 +14,7 @@ mod config;
 mod edit;
 mod gfx;
 mod hotkeys;
+mod http;
 mod i18n;
 mod icons;
 mod images;
@@ -31,6 +32,7 @@ mod shape;
 mod spring;
 mod taskbar;
 mod terminal;
+mod updates;
 mod wallpaper;
 mod weather;
 
@@ -124,6 +126,8 @@ const WM_APP_CAPTURED: u32 = WM_APP + 24;
 const WM_APP_A11Y_SYNC: u32 = WM_APP + 25;
 /// A screen reader pressed a control; `wParam` is its id.
 const WM_APP_A11Y_ACTION: u32 = WM_APP + 26;
+/// The release check state changed or an update notification is waiting.
+const WM_APP_UPDATE: u32 = WM_APP + 27;
 /// The session was unlocked; constant from Win32_System_RemoteDesktop.
 const WTS_SESSION_UNLOCK: usize = 8;
 /// Resume from sleep.
@@ -227,6 +231,7 @@ struct App {
     next_frame: Option<Instant>,
     /// An external event needs one main-surface frame before layer-only rendering can resume.
     main_dirty: bool,
+    update_notice: Option<String>,
 }
 
 thread_local! {
@@ -308,6 +313,10 @@ fn command_exited() {
     wake(WM_APP_TERM);
 }
 
+fn update_changed() {
+    wake(WM_APP_UPDATE);
+}
+
 /// Runs `f` on the app state. A nested call (the window sends a message while the state is
 /// already borrowed) does not panic but returns `None`.
 fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
@@ -360,6 +369,7 @@ fn main() -> Result<()> {
         images::start(images_changed);
         audio::start();
         weather::start(cfg.city.clone(), media_changed);
+        updates::start(update_changed);
         ipc::start(push_arrived);
         let off = modules::off(&cfg);
         modules::sync(&off);
@@ -526,6 +536,7 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
                 menu_restore: false,
                 next_frame: None,
                 main_dirty: true,
+                update_notice: None,
             })
         });
         let _ = windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification(hwnd, windows::Win32::System::RemoteDesktop::NOTIFY_FOR_THIS_SESSION);
@@ -554,6 +565,7 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
         with_app(|a| {
             // Messages that arrived while there was no window.
             a.apply_pushes();
+            a.apply_updates();
             a.sync_note_timer();
             a.render(true);
         });
@@ -999,6 +1011,16 @@ impl App {
             }
             gfx.present()
         });
+        if framed.is_ok()
+            && !HIDDEN.load(Ordering::Relaxed)
+            && self.update_notice.is_some()
+            && self.island.arm_visible_note(updates::NOTICE_KEY, updates::NOTICE_TTL)
+        {
+            if let Some(version) = self.update_notice.take() {
+                updates::notice_shown(&version);
+            }
+            self.sync_note_timer();
+        }
         if let Err(e) = framed {
             proto::error!("gfx", "frame: {e}");
             if gfx::Gfx::is_device_lost(&e) {
@@ -1031,6 +1053,19 @@ impl App {
                     let _ = KillTimer(Some(self.hwnd), TIMER_WAKE);
                 }
             }
+        }
+    }
+
+    fn apply_updates(&mut self) {
+        if !HIDDEN.load(Ordering::Relaxed) && self.update_notice.is_none() {
+            if let Some((version, note)) = updates::pending_notice() {
+                self.update_notice = Some(version);
+                self.notify(note);
+            }
+        }
+        if self.island.menu_title(settings::MODULE) == Some(i18n::t().about) {
+            self.island.menu_replace(settings::MODULE, settings::about_screen());
+            self.animate();
         }
     }
 
@@ -1605,6 +1640,7 @@ impl App {
             let _ = ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
         }
         raise();
+        self.apply_updates();
         self.refresh();
     }
 
@@ -1682,6 +1718,13 @@ impl App {
             Action::OpenApp(part) => {
                 if let Some(app) = self.island.note_app(part) {
                     launcher::apps::launch(&app);
+                }
+                self.island.dismiss_note(part);
+                self.close();
+            }
+            Action::OpenLink(part) => {
+                if let Some(link) = self.island.note_link(part) {
+                    launcher::apps::open(link);
                 }
                 self.island.dismiss_note(part);
                 self.close();
@@ -1956,6 +1999,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             WM_APP_PUSH => {
                 with_app(|a| a.apply_pushes());
+                return LRESULT(0);
+            }
+            WM_APP_UPDATE => {
+                with_app(|a| a.apply_updates());
                 return LRESULT(0);
             }
             WM_TIMER if wparam.0 == TIMER_WAKE => {

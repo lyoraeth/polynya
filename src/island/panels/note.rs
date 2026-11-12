@@ -195,9 +195,10 @@ impl PanelView for NotePanel {
                 }
             }
         }
-        // Click outside close button opens the source app.
-        if n.app.is_some() && a0 > 0.5 {
-            f.hotspots.push(Hotspot { rect: (area.left(), area.top, area.right(), area.top + self.depth), kind: HotKind::OpenApp });
+        // Click outside close button opens the source app or link.
+        if (n.app.is_some() || n.link.is_some()) && a0 > 0.5 {
+            let kind = if n.link.is_some() { HotKind::OpenLink } else { HotKind::OpenApp };
+            f.hotspots.push(Hotspot { rect: (area.left(), area.top, area.right(), area.top + self.depth), kind });
         }
         if n.image.as_ref().is_some_and(|image| image.preview) && a0 > 0.5 {
             f.hotspots.push(Hotspot { rect: (l, y0, l + icon_size, y0 + icon_size), kind: HotKind::ImagePreview(0) });

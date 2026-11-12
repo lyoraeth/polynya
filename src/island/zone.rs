@@ -61,6 +61,7 @@ pub struct Note {
     pub ttl: Option<Duration>,
     pub animated: bool,
     pub app: Option<String>,
+    pub link: Option<String>,
     pub image: Option<proto::ImageRef>,
     pub popup: bool,
     pub swatches: Vec<[u8; 3]>,
@@ -298,6 +299,15 @@ impl Zone {
         self.chips.iter().filter_map(|c| c.deadline).chain(self.free_at(Instant::now())).min()
     }
 
+    pub fn arm_visible_note(&mut self, key: &str, ttl: Duration) -> bool {
+        let Some(c) = self.chips.iter_mut().find(|c| c.note.key == key && !c.leaving && self.rects.iter().any(|(part, _)| *part == c.part())) else {
+            return false;
+        };
+        c.note.ttl = Some(ttl);
+        c.arm(Instant::now());
+        true
+    }
+
     pub fn step(&mut self, dt: f32, hover: Option<Part>, pointer: Option<Part>, open: Option<Part>, fade: f32) -> bool {
         let now = Instant::now();
         let mut moving = self.advance(now);
@@ -464,6 +474,7 @@ mod tests {
             key: key.into(),
             source: None,
             app: None,
+            link: None,
             image: None,
             popup: false,
             icon: Icon::Key,
@@ -483,6 +494,25 @@ mod tests {
 
     fn order(z: &Zone) -> Vec<&str> {
         z.chips.iter().filter(|c| !c.waiting).map(|c| c.note.key.as_str()).collect()
+    }
+
+    #[test]
+    fn update_notice_expires_only_after_a_visible_frame() {
+        let mut zone = Zone::default();
+        let now = Instant::now();
+        let part = zone.notify_at(note("core:update", None), now);
+        let ttl = Duration::from_secs(10);
+
+        assert!(!zone.expire(now + Duration::from_secs(60)));
+        assert!(!zone.arm_visible_note("core:update", ttl));
+        assert!(zone.next_deadline().is_none());
+
+        zone.rects.push((part, (0.0, 0.0, 100.0, 30.0)));
+        assert!(zone.arm_visible_note("core:update", ttl));
+        let deadline = zone.next_deadline().unwrap();
+        assert!(!zone.expire(deadline - Duration::from_millis(1)));
+        assert!(zone.expire(deadline));
+        assert!(zone.chips[0].leaving);
     }
 
     #[test]

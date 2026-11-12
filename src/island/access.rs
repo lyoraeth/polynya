@@ -110,6 +110,7 @@ fn hot_id(k: HotKind) -> u64 {
         HotKind::Media(Cmd::Seek(_)) | HotKind::Seek { .. } => 1503,
         HotKind::Dismiss => 1600,
         HotKind::OpenApp => 1601,
+        HotKind::OpenLink => 1602,
         HotKind::Note(p) => 1700 + part_id(p),
     }
 }
@@ -181,11 +182,11 @@ impl Island {
                 Panel::Launcher => focus = self.access_launcher(&mut out),
                 Panel::Menu => focus = self.access_menu(&mut out),
                 _ => {
-                    // Other dropdowns have only buttons: player controls, close, swatches, opening the app.
+                    // Other dropdowns have only buttons: player controls, close, swatches, opening the source.
                     for h in &self.hotspots {
                         let name = match h.kind {
                             HotKind::Seek { .. } => n.seek.to_string(),
-                            HotKind::OpenApp => n.open_app.to_string(),
+                            HotKind::OpenApp | HotKind::OpenLink => n.open_app.to_string(),
                             HotKind::Note(p) => self.zone.note(p).map_or_else(|| n.more.to_string(), |note| note.title.clone()),
                             k => match self.icon_name(k) {
                                 Some(name) => name,

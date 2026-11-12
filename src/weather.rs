@@ -11,13 +11,9 @@
 use std::{sync::Mutex, time::Duration};
 
 use serde::Deserialize;
-use windows::{
-    Win32::Networking::WinHttp::{
-        INTERNET_DEFAULT_HTTPS_PORT, WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_FLAG_SECURE, WinHttpCloseHandle, WinHttpConnect, WinHttpOpen,
-        WinHttpOpenRequest, WinHttpQueryDataAvailable, WinHttpReadData, WinHttpReceiveResponse, WinHttpSendRequest, WinHttpSetTimeouts,
-    },
-    core::{Error, HSTRING, PCWSTR, Result, w},
-};
+use windows::core::{Error, Result};
+
+use crate::http;
 
 /// How often to refresh the forecast and how soon to retry after an error.
 const REFRESH: Duration = Duration::from_secs(20 * 60);
@@ -356,56 +352,7 @@ fn urlencode(s: &str) -> String {
 
 /// HTTPS GET, returning the response body as a string.
 pub fn get(host: &str, path: &str) -> Result<String> {
-    // SAFETY: every handle is checked for null and owned by a `Handle` guard that closes it once;
-    // string arguments outlive their calls, and each read writes at most `avail` bytes into the
-    // space just reserved in `body`.
-    unsafe {
-        let session = WinHttpOpen(w!("Polynya"), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, PCWSTR::null(), PCWSTR::null(), 0);
-        if session.is_null() {
-            return Err(Error::from_thread());
-        }
-        let _s = Handle(session);
-        // Without timeouts a hung request would hold the weather thread forever.
-        WinHttpSetTimeouts(session, 10_000, 10_000, 10_000, 15_000)?;
-        let conn = WinHttpConnect(session, &HSTRING::from(host), INTERNET_DEFAULT_HTTPS_PORT, 0);
-        if conn.is_null() {
-            return Err(Error::from_thread());
-        }
-        let _c = Handle(conn);
-        let req = WinHttpOpenRequest(conn, w!("GET"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), std::ptr::null(), WINHTTP_FLAG_SECURE);
-        if req.is_null() {
-            return Err(Error::from_thread());
-        }
-        let _r = Handle(req);
-        WinHttpSendRequest(req, None, None, 0, 0, 0)?;
-        WinHttpReceiveResponse(req, std::ptr::null_mut())?;
-        let mut body = Vec::new();
-        loop {
-            let mut avail = 0u32;
-            WinHttpQueryDataAvailable(req, &mut avail)?;
-            if avail == 0 {
-                break;
-            }
-            let start = body.len();
-            body.resize(start + avail as usize, 0);
-            let mut read = 0u32;
-            WinHttpReadData(req, body[start..].as_mut_ptr() as _, avail, &mut read)?;
-            body.truncate(start + read as usize);
-        }
-        String::from_utf8(body).map_err(|e| Error::new(windows::core::HRESULT(-1), e.to_string()))
-    }
-}
-
-/// Closes a WinHTTP handle when it goes out of scope.
-struct Handle(*mut core::ffi::c_void);
-
-impl Drop for Handle {
-    fn drop(&mut self) {
-        // SAFETY: `self.0` is a non-null WinHTTP handle owned by this guard and closed only here.
-        unsafe {
-            let _ = WinHttpCloseHandle(self.0);
-        }
-    }
+    http::get(host, path, "", 4 * 1024 * 1024)
 }
 
 #[cfg(test)]

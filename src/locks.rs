@@ -104,6 +104,7 @@ fn note(i: usize, on: bool) -> Note {
         key: key.into(),
         source: None,
         app: None,
+        link: None,
         image: None,
         popup: false,
         icon: Icon::Key,

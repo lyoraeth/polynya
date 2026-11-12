@@ -15,7 +15,7 @@ use proto::{Row, Screen};
 use crate::{
     config::{self, Theme},
     i18n::{self, Lang},
-    modules,
+    modules, updates,
 };
 
 /// The settings dropdown's "module".
@@ -271,20 +271,27 @@ fn city_screen() -> Screen {
     Screen { title: Some(tr.set_city.into()), rows }
 }
 
-fn about_screen() -> Screen {
+pub fn about_screen() -> Screen {
     let tr = i18n::t();
-    Screen {
-        title: Some(tr.about.into()),
-        rows: vec![
-            Row::Header { title: "Polynya".into(), subtitle: format!("{} {}", tr.version, env!("POLYNYA_VERSION")) },
-            Row::Text {
-                text: "© 2026 Danil Klimov (lyoraeth) & contributors
+    let state = updates::snapshot();
+    let update = match (&state.available, state.phase) {
+        (Some(release), _) => format!("{}: {} ↗", tr.update_available, release.version),
+        (None, updates::Phase::Checking) => tr.update_checking.into(),
+        (None, updates::Phase::Success) => tr.update_current.into(),
+        (None, updates::Phase::Failed) => tr.update_error.into(),
+        (None, updates::Phase::Never) => tr.update_check.into(),
+    };
+    let rows = vec![
+        Row::Header { title: "Polynya".into(), subtitle: format!("{} {}", tr.version, env!("POLYNYA_VERSION")) },
+        Row::Text {
+            text: "© 2026 Danil Klimov (lyoraeth) & contributors
 GPL-3.0"
-                    .into(),
-            },
-            Row::Button { id: "about.source".into(), text: format!("{} · GitHub", tr.source), plain: false },
-        ],
-    }
+                .into(),
+        },
+        Row::Button { id: "about.update".into(), text: update, plain: false },
+        Row::Button { id: "about.source".into(), text: format!("{} · GitHub", tr.source), plain: false },
+    ];
+    Screen { title: Some(tr.about.into()), rows }
 }
 
 fn lang_name(l: Option<Lang>) -> &'static str {
@@ -372,6 +379,18 @@ pub fn select(id: &str, text: Option<String>) -> (Act, Option<Change>) {
                 open(&d.to_string_lossy());
             }
             (Act::None, None)
+        }
+        "about.update" => {
+            let state = updates::snapshot();
+            if let Some(release) = state.available {
+                open(&release.url);
+                (Act::None, None)
+            } else if state.phase == updates::Phase::Checking {
+                (Act::None, None)
+            } else {
+                updates::check_now();
+                (here(about_screen()), None)
+            }
         }
         "about.source" => {
             open(SOURCE);

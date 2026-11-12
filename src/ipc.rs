@@ -37,6 +37,7 @@ impl From<Msg> for Push {
                 key,
                 source,
                 app,
+                link: None,
                 image,
                 popup,
                 icon: Icon::parse(&icon).unwrap_or(Icon::Info),
