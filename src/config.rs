@@ -27,6 +27,7 @@ pub struct Config {
     /// Interface font; `None` or not installed falls back to the embedded Inter.
     pub font: Option<String>,
     pub theme: Theme,
+    pub launcher_hotkey: String,
     /// Hotkeys of module commands set by the user: `hotkey.<module>.<command> = Ctrl+Alt+D`, as
     /// `("module.command", keys)`. Empty keys turn the manifest's hotkey off.
     pub hotkeys: Vec<(String, String)>,
@@ -52,6 +53,7 @@ impl Default for Config {
             notify_ours: true,
             font: None,
             theme: Theme::Os,
+            launcher_hotkey: "Alt+Space".into(),
             hotkeys: Vec::new(),
         }
     }
@@ -79,6 +81,8 @@ notify_banners = ours
 theme = os
 # Interface font: the name of a family installed in the system. Empty: the embedded Inter.
 font =
+# Launcher hotkey. Empty disables it; clicking the magnifier still opens the launcher.
+hotkey.launcher = Alt+Space
 # Module hotkeys override the module's own: hotkey.<module>.<command> = Ctrl+Alt+D;
 # empty turns the hotkey off. E.g.: hotkey.devtools.convert = Ctrl+Shift+Q
 # Log: %LOCALAPPDATA%\\Polynya\\logs\\polynya.log, in a portable copy logs\\ next to polynya.exe.
@@ -156,6 +160,7 @@ fn parse(text: &str) -> Config {
                 }
             }
             "font" => c.font = Some(v.to_string()).filter(|f| !f.is_empty()),
+            "hotkey.launcher" => c.launcher_hotkey = v.to_string(),
             _ if k.starts_with("hotkey.") => c.hotkeys.push((k["hotkey.".len()..].to_string(), v.to_string())),
             _ => {}
         }
@@ -189,5 +194,15 @@ mod tests {
         assert_eq!(c.terminal_notify, 0);
         let c = parse("hotkey.devtools.convert = Ctrl+Shift+Q\nhotkey.picker.pick =\n");
         assert_eq!(c.hotkeys, [("devtools.convert".into(), "Ctrl+Shift+Q".into()), ("picker.pick".into(), String::new())]);
+    }
+
+    #[test]
+    fn launcher_hotkey_is_separate_from_module_overrides() {
+        assert_eq!(parse("").launcher_hotkey, "Alt+Space");
+        assert_eq!(parse(DEFAULT_FILE).launcher_hotkey, "Alt+Space");
+        let c = parse("hotkey.launcher = Ctrl+Shift+Space\nhotkey.picker.pick = Ctrl+Alt+P\n");
+        assert_eq!(c.launcher_hotkey, "Ctrl+Shift+Space");
+        assert_eq!(c.hotkeys, [("picker.pick".into(), "Ctrl+Alt+P".into())]);
+        assert!(parse("hotkey.launcher =\n").launcher_hotkey.is_empty());
     }
 }

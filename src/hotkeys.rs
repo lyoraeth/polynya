@@ -1,7 +1,7 @@
 // Copyright (c) Danil Klimov (lyoraeth)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Global hotkeys of module commands, and grabbing the user's selection for them.
+//! Global launcher and module hotkeys, and grabbing the user's selection for module commands.
 //!
 //! A command can declare `hotkey = "Ctrl+Alt+D"` in its manifest (the user can override or turn it
 //! off in `config.ini`). With `selection = true` the core copies whatever is selected in the
@@ -30,8 +30,11 @@ use windows::Win32::{
     },
 };
 
+pub mod capture;
+
 /// Hotkey ids of module commands start here; lower ids belong to the core.
 pub const FIRST_ID: i32 = 100;
+pub const LAUNCHER_ID: i32 = 1;
 /// How long to wait for the foreground app to put its selection on the clipboard.
 const COPY_WAIT: Duration = Duration::from_millis(400);
 /// An unassigned key sent before releasing Alt or Win, so the app does not open its menu and
@@ -47,10 +50,48 @@ pub struct Bound {
 }
 
 thread_local! {
+    static LAUNCHER: RefCell<Option<(String, String)>> = const { RefCell::new(None) };
     /// Registered hotkeys by id, with their display text; live on the UI thread that owns the window.
     static BOUND: RefCell<Vec<(i32, Bound, String)>> = const { RefCell::new(Vec::new()) };
     /// Every hotkey the user set, registered or not, as shown: (module, command, keys).
     static SHOWN: RefCell<Vec<(String, String, String)>> = const { RefCell::new(Vec::new()) };
+}
+
+pub fn launcher_keys() -> String {
+    LAUNCHER.with(|keys| keys.borrow().as_ref().map(|(_, shown)| shown.clone()).unwrap_or_default())
+}
+
+pub fn unbind_launcher(hwnd: HWND) {
+    // SAFETY: `hwnd` belongs to the UI thread; an absent registration only returns an error.
+    let _ = unsafe { UnregisterHotKey(Some(hwnd), LAUNCHER_ID) };
+    LAUNCHER.with(|keys| *keys.borrow_mut() = None);
+}
+
+pub fn bind_launcher(hwnd: HWND, keys: &str) -> bool {
+    if LAUNCHER.with(|current| current.borrow().as_ref().map(|(keys, _)| keys.as_str()).unwrap_or_default() == keys) {
+        return true;
+    }
+    let wanted = if keys.is_empty() {
+        None
+    } else if let Some(binding) = parse(keys) {
+        Some(binding)
+    } else {
+        proto::warn!("hotkeys", "launcher: cannot parse hotkey \"{keys}\"");
+        return false;
+    };
+    let previous = LAUNCHER.with(|current| current.borrow().as_ref().map(|(keys, _)| keys.clone()));
+    unbind_launcher(hwnd);
+    let Some((mods, key)) = wanted else { return true };
+    // SAFETY: `hwnd` belongs to the UI thread; this id is reserved for the launcher.
+    if unsafe { RegisterHotKey(Some(hwnd), LAUNCHER_ID, mods | MOD_NOREPEAT, key) }.is_ok() {
+        LAUNCHER.with(|current| *current.borrow_mut() = Some((keys.into(), display(keys))));
+        return true;
+    }
+    proto::warn!("hotkeys", "launcher: could not register {keys}");
+    if let Some(previous) = previous {
+        bind_launcher(hwnd, &previous);
+    }
+    false
 }
 
 /// Parses a hotkey like `Ctrl+Alt+D`, `Ctrl+Shift+F2` or `Win+Alt+Space`. Case-insensitive.
@@ -86,11 +127,18 @@ fn vk(name: &str) -> Option<u32> {
         "space" => 0x20,
         "enter" => 0x0D,
         "tab" => 0x09,
-        "insert" => 0x2D,
+        "insert" | "ins" => 0x2D,
+        "escape" | "esc" => 0x1B,
+        "delete" | "del" => 0x2E,
+        "backspace" => 0x08,
+        "left" => 0x25,
+        "up" => 0x26,
+        "right" => 0x27,
+        "down" => 0x28,
         "home" => 0x24,
         "end" => 0x23,
-        "pageup" => 0x21,
-        "pagedown" => 0x22,
+        "pageup" | "pgup" => 0x21,
+        "pagedown" | "pgdn" => 0x22,
         "`" | "backquote" => 0xC0,
         "-" | "minus" => 0xBD,
         "=" | "equal" => 0xBB,
@@ -301,6 +349,7 @@ mod tests {
 
     #[test]
     fn parses_hotkeys() {
+        assert_eq!(parse("Alt+Space"), Some((MOD_ALT, 0x20)));
         assert_eq!(parse("Ctrl+Alt+D"), Some((MOD_CONTROL | MOD_ALT, 'D' as u32)));
         assert_eq!(parse("ctrl + shift + f2"), Some((MOD_CONTROL | MOD_SHIFT, 0x71)));
         assert_eq!(parse("Win+Space"), Some((MOD_WIN, 0x20)));

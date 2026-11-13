@@ -153,7 +153,7 @@ impl Island {
             out.push(element(part_id(p), 0, Role::Button, s.label(), Some((x, bar_t, x + w, bar_b))));
         }
         let mut search = element(part_id(Part::Search), 0, Role::Button, n.search, Some(self.search));
-        search.description = "Alt+Space".into();
+        search.description = crate::hotkeys::launcher_keys();
         out.push(search);
         let mut newest = None;
         for &(p, r) in self.zone.parts() {
@@ -291,7 +291,11 @@ impl Island {
             return self.icon_name(h.kind).map(|name| (name, h.rect));
         }
         let n = &crate::i18n::t().names;
-        super::kit::inside(self.search, x, y).then(|| (format!("{} · Alt+Space", n.search), self.search))
+        super::kit::inside(self.search, x, y).then(|| {
+            let keys = crate::hotkeys::launcher_keys();
+            let text = if keys.is_empty() { n.search.into() } else { format!("{} · {keys}", n.search) };
+            (text, self.search)
+        })
     }
 
     /// Advances the tooltip; `true` while it is waiting or fading.

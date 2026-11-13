@@ -14,6 +14,7 @@ use proto::{Row, Screen};
 
 use crate::{
     config::{self, Theme},
+    hotkeys,
     i18n::{self, Lang},
     modules, updates,
 };
@@ -39,6 +40,8 @@ pub enum Change {
     Theme(Theme),
     City(Option<String>),
     Terminal(u64),
+    LauncherHotkey(String),
+    CaptureLauncherHotkey,
     /// A module was switched on or off.
     Module(String),
 }
@@ -189,6 +192,8 @@ pub fn main() -> Screen {
     let city = c.city.clone().unwrap_or_else(|| tr.city_auto.into());
     rows.push(item("city", tr.set_city, city));
     rows.push(section(tr.sec_behaviour));
+    let launcher_keys = if c.launcher_hotkey.is_empty() { tr.off.into() } else { hotkeys::display(&c.launcher_hotkey) };
+    rows.push(item("launcher", tr.set_launcher_hotkey, launcher_keys));
     let all = modules::scan();
     let off = modules::off(&c);
     let on = all.iter().filter(|m| !off.contains(&m.id)).count();
@@ -271,6 +276,22 @@ fn city_screen() -> Screen {
     Screen { title: Some(tr.set_city.into()), rows }
 }
 
+pub fn launcher_hotkey_screen(keys: String, error: Option<&str>, recording: bool) -> Screen {
+    let tr = i18n::t();
+    let label = if recording && keys.is_empty() {
+        tr.launcher_hotkey_waiting.into()
+    } else if keys.is_empty() {
+        tr.off.into()
+    } else {
+        hotkeys::display(&keys)
+    };
+    let mut rows = vec![Row::Button { id: "launcher.capture".into(), text: label, plain: false }, Row::Text { text: tr.launcher_hotkey_help.into() }];
+    if let Some(error) = error {
+        rows.push(Row::Text { text: error.into() });
+    }
+    Screen { title: Some(tr.set_launcher_hotkey.into()), rows }
+}
+
 pub fn about_screen() -> Screen {
     let tr = i18n::t();
     let state = updates::snapshot();
@@ -351,6 +372,16 @@ pub fn select(id: &str, text: Option<String>) -> (Act, Option<Change>) {
         "autostart" => {
             crate::autostart::set(!crate::autostart::is_enabled());
             (here(main()), None)
+        }
+        "launcher" => (Act::Push(launcher_hotkey_screen(c.launcher_hotkey, None, false)), None),
+        "launcher.capture" => (Act::None, Some(Change::CaptureLauncherHotkey)),
+        "launcher.hotkey" => {
+            let Some(text) = text else { return (Act::None, None) };
+            let keys = text.trim().to_string();
+            if !keys.is_empty() && hotkeys::parse(&keys).is_none() {
+                return (here(launcher_hotkey_screen(keys, Some(i18n::t().launcher_hotkey_invalid), false)), None);
+            }
+            (Act::None, Some(Change::LauncherHotkey(keys)))
         }
         "city" => (Act::Push(city_screen()), None),
         "modules" => (Act::Push(modules_screen()), None),

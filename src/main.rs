@@ -58,8 +58,8 @@ use windows::{
             Accessibility::{HWINEVENTHOOK, SetWinEventHook},
             HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI, SetProcessDpiAwarenessContext},
             Input::KeyboardAndMouse::{
-                GetKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, MOD_ALT, MOD_NOREPEAT, RegisterHotKey, SendInput,
-                TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent, UnregisterHotKey, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_N, VK_SHIFT, VK_SPACE,
+                GetKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput, TME_LEAVE, TRACKMOUSEEVENT,
+                TrackMouseEvent, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_N, VK_SHIFT,
             },
             Shell::{
                 NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW, QUNS_ACCEPTS_NOTIFICATIONS, QUNS_PRESENTATION_MODE,
@@ -140,8 +140,7 @@ const REBUILD_DEBOUNCE_MS: u32 = 300;
 const TIMER_NOTES: usize = 3;
 /// Next picture change without continuous animation: the Claude logo glyph.
 const TIMER_WAKE: usize = 4;
-/// Launcher hotkey: Alt+Space.
-const HOTKEY_LAUNCHER: i32 = 1;
+const HOTKEY_LAUNCHER: i32 = hotkeys::LAUNCHER_ID;
 /// Processes finished commands with a delay: the chain's next command does not start at once.
 const TIMER_TERM: usize = 5;
 
@@ -232,6 +231,7 @@ struct App {
     /// An external event needs one main-surface frame before layer-only rendering can resume.
     main_dirty: bool,
     update_notice: Option<String>,
+    hotkey_capture: Option<hotkeys::capture::Capture>,
 }
 
 thread_local! {
@@ -324,6 +324,11 @@ fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
 }
 
 fn main() -> Result<()> {
+    let panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        proto::error!("panic", "{info}");
+        panic_hook(info);
+    }));
     // With a command the exe is a client: it sends a message to the island and exits.
     if let Some(code) = cli::run() {
         std::process::exit(code);
@@ -537,6 +542,7 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
                 next_frame: None,
                 main_dirty: true,
                 update_notice: None,
+                hotkey_capture: None,
             })
         });
         let _ = windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification(hwnd, windows::Win32::System::RemoteDesktop::NOTIFY_FOR_THIS_SESSION);
@@ -547,10 +553,6 @@ fn spawn(instance: HINSTANCE, cfg: &Config) -> Result<()> {
         SetTimer(Some(hwnd), TIMER_PREWARM, PREWARM_MS, None);
 
         add_tray_icon(hwnd);
-        // Alt+Space may be taken by another launcher; then the magnifier click remains.
-        if RegisterHotKey(Some(hwnd), HOTKEY_LAUNCHER, MOD_ALT | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
-            proto::warn!("core", "Alt+Space is taken by another app");
-        }
         sync_hotkeys(hwnd);
         a11y::init(hwnd, a11y::Messages { sync: WM_APP_A11Y_SYNC, action: WM_APP_A11Y_ACTION });
         // Started over a running game: do not show the window, the first check after exit shows it.
@@ -1207,6 +1209,7 @@ impl App {
     }
 
     fn close_menu(&mut self, restore: bool) {
+        self.cancel_hotkey_capture();
         if !self.island.menu_open() || self.settings_guard() {
             return;
         }
@@ -1267,7 +1270,7 @@ impl App {
 
     /// A settings item was selected or text was entered in a field.
     fn settings(&mut self, id: &str, text: Option<String>) {
-        let (act, change) = settings::select(id, text);
+        let (mut act, change) = settings::select(id, text);
         match change {
             Some(settings::Change::Theme(t)) => {
                 self.theme = t;
@@ -1275,6 +1278,20 @@ impl App {
             }
             Some(settings::Change::City(c)) => weather::set_city(c),
             Some(settings::Change::Terminal(s)) => TERMINAL_MIN.store(s, Ordering::Relaxed),
+            Some(settings::Change::LauncherHotkey(keys)) => {
+                let error = if hotkeys::bind_launcher(self.hwnd, &keys) {
+                    config::set("hotkey.launcher", &keys);
+                    None
+                } else {
+                    Some(i18n::t().launcher_hotkey_failed)
+                };
+                act = settings::Act::Replace { screen: settings::launcher_hotkey_screen(keys, error, false), root: Some(settings::main()) };
+            }
+            Some(settings::Change::CaptureLauncherHotkey) => {
+                self.hotkey_capture = None;
+                self.hotkey_capture = Some(hotkeys::capture::Capture::start());
+                act = settings::Act::Replace { screen: settings::launcher_hotkey_screen(String::new(), None, true), root: None };
+            }
             Some(settings::Change::Module(id)) => {
                 let off = modules::off(&config::load());
                 if id == "agents" && off.iter().any(|id| id == "agents") {
@@ -1307,8 +1324,41 @@ impl App {
         self.animate();
     }
 
+    fn cancel_hotkey_capture(&mut self) {
+        if self.hotkey_capture.take().is_some() && self.island.menu_title(settings::MODULE) == Some(i18n::t().set_launcher_hotkey) {
+            self.island.menu_replace(settings::MODULE, settings::launcher_hotkey_screen(config::load().launcher_hotkey, None, false));
+            self.animate();
+        }
+    }
+
+    fn capture_hotkey(&mut self) {
+        use hotkeys::capture::Event;
+        while let Some(event) = self.hotkey_capture.as_mut().and_then(|capture| capture.take()) {
+            match event {
+                Event::Complete(keys) => {
+                    proto::info!("hotkeys", "launcher capture completed: {keys}");
+                    self.hotkey_capture = None;
+                    self.settings("launcher.hotkey", Some(keys));
+                    return;
+                }
+                Event::Cancel => {
+                    self.cancel_hotkey_capture();
+                    return;
+                }
+                Event::Changed(keys) => {
+                    self.island.menu_replace(settings::MODULE, settings::launcher_hotkey_screen(keys, None, true));
+                }
+                Event::Invalid => {
+                    self.island.menu_replace(settings::MODULE, settings::launcher_hotkey_screen(String::new(), Some(i18n::t().launcher_hotkey_invalid), true));
+                }
+            }
+            self.animate();
+        }
+    }
+
     /// Tells the module its dropdown closed: it may care whether it is open.
-    fn menu_closed(&self) {
+    fn menu_closed(&mut self) {
+        self.cancel_hotkey_capture();
         if let Some(m) = self.island.menu_module().filter(|m| *m != settings::MODULE) {
             modules::send(m, &proto::ModIn::Closed);
         }
@@ -1316,6 +1366,12 @@ impl App {
 
     fn menu_effect(&mut self, e: island::MenuEffect) {
         use island::MenuEffect;
+        if !matches!(e, MenuEffect::None) {
+            if self.hotkey_capture.is_some() {
+                proto::info!("hotkeys", "launcher capture cancelled by menu interaction");
+            }
+            self.cancel_hotkey_capture();
+        }
         match e {
             MenuEffect::None => {}
             MenuEffect::Redraw => self.animate(),
@@ -1613,6 +1669,9 @@ impl App {
             return;
         }
         HIDDEN.store(fullscreen, Ordering::Relaxed);
+        if fullscreen {
+            self.cancel_hotkey_capture();
+        }
         audio::set_paused(fullscreen);
         // SAFETY: `self.hwnd` is our window on this thread; the Win32 calls take it and plain values.
         unsafe {
@@ -1884,6 +1943,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             // Over a fullscreen app too: the island shows, the launcher takes focus, and Windows raises the
             // taskbar itself, as on Win. Esc returns focus to the app, and the island hides again.
+            WM_HOTKEY
+                if with_app(|a| {
+                    let Some(capture) = a.hotkey_capture.as_mut() else { return false };
+                    capture.registered(lparam.0 as u32 & 0xFFFF, (lparam.0 as u32 >> 16) & 0xFFFF);
+                    a.capture_hotkey();
+                    true
+                }) == Some(true) =>
+            {
+                return LRESULT(0);
+            }
             WM_HOTKEY if wparam.0 as i32 == HOTKEY_LAUNCHER => {
                 if vertical() {
                     return LRESULT(0);
@@ -1900,6 +1969,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             WM_KEYDOWN if wparam.0 == windows::Win32::UI::Input::KeyboardAndMouse::VK_PROCESSKEY.0 as usize => {}
             WM_KEYDOWN | WM_SYSKEYDOWN => {
                 let handled = with_app(|a| {
+                    if let Some(capture) = a.hotkey_capture.as_mut() {
+                        capture.key(wparam.0 as u32, false);
+                        a.capture_hotkey();
+                        return true;
+                    }
                     let ctrl = GetKeyState(VK_CONTROL.0 as i32) < 0;
                     let shift = GetKeyState(VK_SHIFT.0 as i32) < 0;
                     if a.island.menu_open() {
@@ -1918,6 +1992,18 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     return LRESULT(0);
                 }
             }
+            WM_KEYUP | WM_SYSKEYUP => {
+                if with_app(|a| {
+                    let Some(capture) = a.hotkey_capture.as_mut() else { return false };
+                    capture.key(wparam.0 as u32, true);
+                    a.capture_hotkey();
+                    true
+                }) == Some(true)
+                {
+                    return LRESULT(0);
+                }
+            }
+            WM_CHAR | WM_SYSCHAR if with_app(|a| a.hotkey_capture.is_some()) == Some(true) => return LRESULT(0),
             // A lone Alt puts the window into system menu mode, and letters arrive as WM_SYSCHAR, so the
             // launcher "stopped typing". The island has no menu, so the mode is not needed.
             WM_SYSCOMMAND if (wparam.0 & 0xFFF0) as u32 == SC_KEYMENU => return LRESULT(0),
@@ -2205,7 +2291,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 modules::reconcile(&modules::off(&config::load()), vertical());
             }
             WM_DESTROY => {
-                let _ = UnregisterHotKey(Some(hwnd), HOTKEY_LAUNCHER);
+                hotkeys::unbind_launcher(hwnd);
                 hotkeys::sync(hwnd, Vec::new());
                 with_app(|a| {
                     if let Some(tid) = a.hook.take() {
@@ -2241,13 +2327,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             // A new taskbar is drawn in steps, like at boot: a single capture can catch it half-painted.
             BOOT_LOOK.with(|b| b.set(0));
             SetTimer(Some(hwnd), TIMER_LOOK_BOOT, LOOK_BOOT_MS[0], None);
-            // The window survived and still holds Alt+Space: registering it again would fail and
-            // report a conflict that is not there.
-            let _ = UnregisterHotKey(Some(hwnd), HOTKEY_LAUNCHER);
-            // Alt+Space may be taken by another launcher; then the magnifier click remains.
-            if RegisterHotKey(Some(hwnd), HOTKEY_LAUNCHER, MOD_ALT | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
-                proto::warn!("core", "Alt+Space is taken by another app");
-            }
             sync_hotkeys(hwnd);
         }
         DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -2257,6 +2336,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 /// Registers the hotkeys of enabled modules' commands, as the manifests and `config.ini` set them.
 fn sync_hotkeys(hwnd: HWND) {
     let c = config::load();
+    hotkeys::bind_launcher(hwnd, &c.launcher_hotkey);
     hotkeys::sync(hwnd, modules::hotkeys(&modules::off(&c), &c.hotkeys));
 }
 
