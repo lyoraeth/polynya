@@ -13,6 +13,11 @@ $names = foreach ($arch in 'x64', 'arm64') {
 function gh {
     $releaseTestState.Requests.Add($args)
     $global:LASTEXITCODE = 0
+    if ($args[0] -eq 'api') {
+        if ($args[1] -cne 'repos/lyoraeth/polynya/commits/v9.9.9') { throw 'Unexpected commit request.' }
+        $global:LASTEXITCODE = [int]$releaseTestState.CommitExit
+        return ('a' * 40)
+    }
     if ($args[0] -ne 'release' -or $args[2] -cne 'v9.9.9') { throw 'Unexpected GitHub request.' }
     if ($args[1] -eq 'view') {
         $global:LASTEXITCODE = [int]$releaseTestState.ViewExit
@@ -28,6 +33,11 @@ function gh {
     if (@(Compare-Object $releaseTestState.Names $patterns).Count) { throw 'Download did not request exactly the six release assets.' }
     foreach ($name in $patterns) { [IO.File]::WriteAllText((Join-Path $destination $name), "Downloaded fixture: $name") }
 }
+function git {
+    if (($args -join ' ') -cne 'rev-parse HEAD') { throw 'Unexpected Git command.' }
+    $global:LASTEXITCODE = [int]$releaseTestState.GitExit
+    return $releaseTestState.Head
+}
 
 $cases = @(
     @{ Name = 'stable'; Tag = 'v9.9.9' },
@@ -40,6 +50,9 @@ $cases = @(
     @{ Name = 'missing-asset'; Tag = 'v9.9.9'; Missing = $true; Error = '*Missing or ambiguous release asset*' },
     @{ Name = 'duplicate-asset'; Tag = 'v9.9.9'; Duplicate = $true; Error = '*Missing or ambiguous release asset*' },
     @{ Name = 'view-failure'; Tag = 'v9.9.9'; ViewExit = 1; Error = '*gh release view failed*' },
+    @{ Name = 'commit-failure'; Tag = 'v9.9.9'; CommitExit = 1; Error = '*Could not resolve the release source commit*' },
+    @{ Name = 'wrong-checkout'; Tag = 'v9.9.9'; WrongHead = $true; Error = '*Check out the release source commit*' },
+    @{ Name = 'git-failure'; Tag = 'v9.9.9'; GitExit = 1; Error = '*Check out the release source commit*' },
     @{ Name = 'download-failure'; Tag = 'v9.9.9'; DownloadExit = 1; Error = '*gh release download failed*' },
     @{ Name = 'existing-directory'; Tag = 'v9.9.9'; Existing = $true; Error = '*Download directory already exists*' }
 )
@@ -47,6 +60,9 @@ foreach ($case in $cases) {
     $releaseTestState = @{
         Requests = [Collections.Generic.List[object]]::new()
         ViewExit = [int]$case.ViewExit
+        CommitExit = [int]$case.CommitExit
+        GitExit = [int]$case.GitExit
+        Head = if ($case.WrongHead) { 'b' * 40 } else { 'a' * 40 }
         DownloadExit = [int]$case.DownloadExit
         Names = $names
         Metadata = @{
@@ -66,7 +82,7 @@ foreach ($case in $cases) {
         $generated = & "$PSScriptRoot/release-manifests.ps1" -Tag $case.Tag -Dist $dist -Output $outputDir
         if ($case.Error) { throw "Unexpectedly accepted: $($case.Name)" }
         $manifest = Get-Content "$generated/scoop/bucket/polynya.json" -Raw | ConvertFrom-Json
-        if ($manifest.version -ne '9.9.9' -or $releaseTestState.Requests.Count -ne 2) { throw 'Stable release was not prepared correctly.' }
+        if ($manifest.version -ne '9.9.9' -or $releaseTestState.Requests.Count -ne 3) { throw 'Stable release was not prepared correctly.' }
         foreach ($key in '64bit', 'arm64') {
             for ($i = 0; $i -lt 2; $i++) {
                 $name = $manifest.architecture.$key.url[$i].Split('/')[-1]

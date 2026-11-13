@@ -32,9 +32,21 @@ jobs:
     outputs:
       version: ${{ steps.generate.outputs.version }}
     steps:
+      - name: Resolve release source commit
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+            throw 'Expected a stable release tag: vX.Y.Z.'
+          }
+          $commit = gh api "repos/lyoraeth/polynya/commits/$env:RELEASE_TAG" --jq .sha
+          if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Could not resolve the release source commit.' }
+          "commit=$commit" >> $env:GITHUB_OUTPUT
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ steps.source.outputs.commit }}
           persist-credentials: false
       - name: Download release and generate manifests
         id: generate

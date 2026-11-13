@@ -16,6 +16,10 @@ $release = $metadata | ConvertFrom-Json
 if ($release.tagName -cne $Tag -or $release.isDraft -ne $false -or $release.isPrerelease -ne $false) {
     throw 'Only a published stable release with the requested tag can be distributed.'
 }
+$commit = & gh api "repos/$repo/commits/$Tag" --jq .sha
+if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Could not resolve the release source commit.' }
+$head = & git rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $head -cne $commit) { throw 'Check out the release source commit before generating its manifests.' }
 $version = $Tag.Substring(1)
 $names = foreach ($arch in 'x64', 'arm64') {
     foreach ($kind in 'setup.exe', 'portable.zip', 'modules.zip') { "Polynya-$version-$arch-$kind" }
