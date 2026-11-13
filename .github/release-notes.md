@@ -1,27 +1,48 @@
-Polynya 1.1.1 unlocks monitor-refresh-rate animations, moves scrolling text into dedicated DirectComposition layers, and fixes disabling the AI agents module.
+Polynya 1.2.0 adds background release checks, a configurable launcher hotkey, and installation through Scoop and WinGet.
 
 ## What's new
 
-* **Animations at the monitor's refresh rate.** Interactive controls are no longer capped at 30 fps and now run at your display's native refresh rate: toggle switches, page transitions in menus and settings, selection highlights, list scrolling and action menus in the launcher, and the confirmation progress bar.
-* **Scrolling text on dedicated DirectComposition layers.** Long track titles over glass backgrounds, the selected row in the launcher, weather details on hover, notification text, and long menu labels no longer redraw the main island on every frame. Text is rasterized into a bitmap once (with gradient masks cached by width and color) and scrolled smoothly on its own transparent layer at the monitor's refresh rate; layers are removed from the visual tree as soon as they close. On opaque taskbar backgrounds, the player still uses the zero-CPU DWM composition animation. Usage at rest stays at 0% CPU, while scrolling both a player track and a long launcher result simultaneously at 75 Hz takes ~0.6% CPU and ~37 MB of memory.
-* **Unified AI agent indicator.** All supported agents (Claude Code, Codex, Cursor, and Kimi Code) now share the same 8 Hz terminal-glyph animation instead of spinning the logo continuously, dropping an extra frame loop and keeping status chips consistent across tools.
-* **Fixed width for the "+N" notification pile.** Hovering over the collapsed notification counter no longer expands it or starts a marquee, preventing the island from accidentally overlapping adjacent taskbar icons. Clicking "+N" still opens the full notification stack, and hover behavior on regular notification chips is unchanged.
+* **Release checks in the background and on demand.** Polynya checks GitHub Releases after startup and then once a day. A newer stable version is announced once in the notification stack. In **Settings → About**, the update button shows the available version and opens its release page; you can also start a check manually. The checker announces releases and opens their pages; it does not replace application files automatically.
+* **Choose the launcher hotkey by pressing it.** Open **Settings → Launcher hotkey**, click the current binding and press your preferred combination. **Esc** cancels recording; **Delete** disables the hotkey. `Alt+Space` remains the default, and the launcher can still be opened with the magnifier. The binding is also stored as `hotkey.launcher` in `config.ini`.
+* **Scoop and WinGet distribution.** Stable release publication now generates package manifests from the tagged sources and the final release files. Everything is declared as a required dependency. Scoop preserves settings, logs and custom modules across updates and reinstalls, and switches the core and bundled modules together on rollback. WinGet catalog availability follows Microsoft's manifest validation.
+* **English, Russian, Chinese and Japanese.** The new update states, hotkey recorder and error messages are localized in all four interface languages.
 
-## Fixes
+## Installation and updates
 
-* **Disabling the AI agents module.** Turning the module off in settings now immediately dismisses active status chips from the taskbar and blocks new events—even if an already running terminal or IDE still holds the hooks in memory until it restarts.
-* **Cleaned up search and module lists.** Removed leftover test entries for image verification that stayed in the launcher and settings after the API v2 rollout in `1.1.0`.
+**WinGet:**
 
----
+```powershell
+winget install --id lyoraeth.Polynya --exact --source winget
+```
 
-## Which file to download
+Update an existing installation with `winget upgrade --id lyoraeth.Polynya --exact`.
+
+**Scoop:**
+
+```powershell
+scoop bucket add extras
+scoop bucket add polynya https://github.com/lyoraeth/polynya
+scoop install polynya/polynya
+```
+
+Start and configure Everything for file search. To update Polynya, run `polynya quit`, then `scoop update polynya`, and launch Polynya again. The experimental notification identity package is kept during ordinary Scoop updates and removed on uninstall.
+
+**Direct downloads:** choose the files for your architecture from the assets below.
 
 | File | For whom |
 | :--- | :--- |
-| **`Polynya-1.1.1-x64-setup.exe`** | **Most people.** Installs without admin rights, lets you pick modules and optionally installs Everything for file search. Updates in place and keeps your settings. |
-| **`Polynya-1.1.1-arm64-setup.exe`** | The same installer built natively for Windows on ARM (Snapdragon and others). |
-| **`…-portable.zip` + `…-modules.zip`** | **Portable version:** unpack both archives into the same folder and run `polynya.exe`. Settings and logs stay in that folder; nothing is written to AppData or the registry. |
+| **`Polynya-1.2.0-x64-setup.exe`** | **Most people.** Installs for the current user, lets you choose modules and can install Everything for file search. Run a newer installer to update in place while keeping your settings. |
+| **`Polynya-1.2.0-arm64-setup.exe`** | The same installer built natively for Windows on ARM. |
+| **`…-portable.zip` + `…-modules.zip`** | Extract both archives for the same architecture into one folder and run `polynya.exe`. Settings and logs stay there. To update, close Polynya and extract the new archives over the existing files, keeping your `data` and `logs` folders. |
 
-> **Requirements & SmartScreen:** Windows 11 only (Windows 10 is not supported). Builds are not code-signed yet, so if Windows shows *"Windows protected your PC"* on first run, click **More info → Run anyway**.
+## Packaging fixes
 
-**Documentation:** [User guide](https://github.com/lyoraeth/polynya/blob/main/docs/guide.md) · [Limitations and FAQ](https://github.com/lyoraeth/polynya/blob/main/docs/troubleshooting.md) · [Module API](https://github.com/lyoraeth/polynya/blob/main/docs/module-api.md) · [Module examples](https://github.com/lyoraeth/polynya/blob/main/docs/module-examples.md) · [На русском](https://github.com/lyoraeth/polynya/blob/main/README.ru.md)
+* Silent installation no longer launches Polynya or its bundled Everything and notification-package installers. Package managers handle their dependencies.
+* Silent uninstall keeps settings and logs without asking a question. Interactive uninstall still offers the choice to delete them.
+* Scoop lifecycle failures stop the operation instead of reporting success with incomplete files or autostart state. User data and third-party module directories are preserved; conflicting paths are reported explicitly.
+
+> **Requirements & SmartScreen:** Windows 11, build 22000 or newer, on x64 or ARM64. Builds are not code-signed yet; if Windows shows *"Windows protected your PC"*, choose **More info → Run anyway**. Everything and the optional experimental notification-package setup may request UAC. Run Polynya itself as a regular user.
+
+**Documentation:** [User guide](https://github.com/lyoraeth/polynya/blob/main/docs/guide.md) · [Limitations and FAQ](https://github.com/lyoraeth/polynya/blob/main/docs/troubleshooting.md) · [Module API](https://github.com/lyoraeth/polynya/blob/main/docs/module-api.md) · [На русском](https://github.com/lyoraeth/polynya/blob/main/README.ru.md)
+
+**Full changelog:** https://github.com/lyoraeth/polynya/compare/v1.1.1...v1.2.0
