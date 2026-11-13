@@ -154,7 +154,7 @@ scoop bucket add polynya https://github.com/lyoraeth/polynya
 scoop install polynya/polynya
 ```
 
-Scoop installs the portable version with bundled modules and Everything. Launch Polynya from the Start menu or run `polynya`; start and configure Everything for file search. Update with `scoop update polynya`; remove with `scoop uninstall polynya`. Settings and logs are preserved. The experimental Windows notifications module needs reactivation after a Scoop update.
+Scoop installs the portable version with bundled modules and Everything. Launch Polynya from the Start menu or run `polynya`; start and configure Everything for file search. To update, run `polynya quit`, then `scoop update polynya`; remove with `scoop uninstall polynya`. Settings and logs are preserved. Launch Polynya again after updating.
 
 Install Polynya using one of the methods below. WinGet updates may arrive with a delay; the latest version is always available in GitHub Releases.
 

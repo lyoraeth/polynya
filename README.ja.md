@@ -154,7 +154,7 @@ scoop bucket add polynya https://github.com/lyoraeth/polynya
 scoop install polynya/polynya
 ```
 
-Scoop は同梱モジュール付きのポータブル版と Everything をインストールします。スタートメニューまたは `polynya` コマンドで起動し、ファイル検索には Everything も起動・設定してください。更新は `scoop update polynya`、削除は `scoop uninstall polynya` です。設定とログは保持されます。Scoop で更新した後は、試験的な Windows 通知モジュールを再度有効化する必要があります。
+Scoop は同梱モジュール付きのポータブル版と Everything をインストールします。スタートメニューまたは `polynya` コマンドで起動し、ファイル検索には Everything も起動・設定してください。更新時は `polynya quit` の後に `scoop update polynya` を実行します。削除は `scoop uninstall polynya` です。設定とログは保持されます。更新後は Polynya を再度起動してください。
 
 以下のいずれかの方法で Polynya をインストールしてください。WinGet での更新には遅れが生じる場合があります。最新版は常に GitHub Releases から入手できます。
 

@@ -154,7 +154,7 @@ scoop bucket add polynya https://github.com/lyoraeth/polynya
 scoop install polynya/polynya
 ```
 
-Scoop установит портативную версию с комплектными модулями и Everything. Запустите Polynya из меню «Пуск» или командой `polynya`; для поиска файлов запустите и настройте Everything. Обновление: `scoop update polynya`; удаление: `scoop uninstall polynya`. Настройки и логи сохраняются. После обновления через Scoop экспериментальный модуль уведомлений Windows нужно активировать заново.
+Scoop установит портативную версию с комплектными модулями и Everything. Запустите Polynya из меню «Пуск» или командой `polynya`; для поиска файлов запустите и настройте Everything. Для обновления выполните `polynya quit`, затем `scoop update polynya`; для удаления — `scoop uninstall polynya`. Настройки и логи сохраняются. После обновления снова запустите Polynya.
 
 Устанавливайте Polynya одним из способов ниже. Обновления в WinGet могут появляться с задержкой; актуальная версия всегда доступна в GitHub Releases.
 

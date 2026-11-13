@@ -154,7 +154,7 @@ scoop bucket add polynya https://github.com/lyoraeth/polynya
 scoop install polynya/polynya
 ```
 
-Scoop 会安装包含随附模块的便携版和 Everything。从开始菜单或运行 `polynya` 启动 Polynya；文件搜索还需要启动并配置 Everything。更新：`scoop update polynya`；卸载：`scoop uninstall polynya`。设置和日志会保留。通过 Scoop 更新后，需要重新启用实验性的 Windows 通知模块。
+Scoop 会安装包含随附模块的便携版和 Everything。从开始菜单或运行 `polynya` 启动 Polynya；文件搜索还需要启动并配置 Everything。更新时，先运行 `polynya quit`，再运行 `scoop update polynya`；卸载：`scoop uninstall polynya`。设置和日志会保留。更新后请重新启动 Polynya。
 
 请选择下方的一种方式安装 Polynya。WinGet 更新可能有所延迟；最新版本始终可在 GitHub Releases 获取。
 

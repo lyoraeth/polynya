@@ -4,10 +4,13 @@
 
 `.github/workflows/distribute.yml` runs when a stable GitHub Release is published. Tag builds
 still create a draft: inspect it and publish it manually. Prereleases are excluded. The workflow
-and packaging scripts must be on the default branch before publishing the release.
+must be on the default branch before publishing the release. The generator and Scoop hooks must
+be included in the release tag itself.
 
 The workflow downloads all six final assets from that release and generates manifests with their
-actual hashes. Scoop and WinGet then run independently:
+actual hashes. Generation checks out the commit resolved from the release tag and verifies HEAD
+against that commit again before downloading. Retrying an old release never substitutes packaging
+code from the latest default branch. Scoop and WinGet then run independently:
 
 - **Scoop:** commit `bucket/polynya.json` to this repository's default branch with `GITHUB_TOKEN`.
   Repository/organization policy must permit `contents: write`, and branch rules must allow this
@@ -77,6 +80,8 @@ launch Polynya or invoke its bundled Everything and notify installers; dependenc
 is handled by WinGet itself. Everything's own installer may need elevation. The notify package
 still requires interactive activation.
 Regular interactive setup keeps its existing behavior.
+Silent uninstall never asks about deleting settings and logs: it keeps them. Interactive uninstall
+still offers that choice.
 
 Before submitting:
 
@@ -92,9 +97,18 @@ Before submitting:
 ## Scoop
 
 The `scoop/bucket/polynya.json` file installs the portable core and bundled modules. The `portable`
-marker prevents self-relocation to `%LOCALAPPDATA%`. `data`, `logs` and the module tree are
-persisted. Fresh bundled module files replace only their own paths during install, preserving
-third-party modules and their data. `extras/everything` is a required dependency, so the Extras
+marker prevents self-relocation to `%LOCALAPPDATA%`. `data`, `logs` and the user module tree are
+persisted. Bundled binaries stay in each version's `bundled/modules` directory; persisted entries
+for them are junctions through `apps/polynya/current/bundled/modules`. Switching `current` with
+`scoop reset polynya@<version>` selects that version's core and bundled binaries together without
+requiring a hook to run. Third-party modules remain in the shared module tree. Conflicting real
+directories are rejected rather than overwritten. Scoop's `no_junction` option is unsupported
+and rejected before installation.
+
+Physical module roots also have portable markers. `bundled/data` and `bundled/logs` map to the
+same persisted data as the core, so Windows resolving executable junctions does not change where
+module data is stored. Both nested links are declared in `persist`: Scoop must unlink them before
+cleaning a version directory. `extras/everything` is a required dependency, so the Extras
 bucket must be available. Its portable package still needs Everything to be started/configured;
 declaring a dependency does not install its indexing service or prove file search is ready.
 The pre-install hook rejects Windows versions below `10.0.22000` (Windows 11). Scoop runs this
@@ -102,11 +116,17 @@ check after downloading/extracting the archives, before linking and persisting P
 
 The lifecycle scripts in `packaging/scoop` are embedded into the manifest by the generator:
 
-- Before update/uninstall, remember an autostart entry owned by this Scoop installation, then run
-  Polynya's cleanup command without `--purge`. This stops the app and removes its integrations.
+- Before an update, remember an autostart entry owned by this Scoop installation, then run
+  `polynya quit`. Agent hooks and the registered notification package are kept.
 - After installation/update, restore remembered autostart through Scoop's stable `current` path.
-  The app does not start automatically. Launch it to restore enabled agent integrations.
+  A failed registry write retains the marker for a retry. The app does not start automatically.
+- On final uninstall, run Polynya's full cleanup without `--purge`: stop the app, unregister agent
+  hooks, remove the notification package and remove this installation's autostart and retry marker.
 - Persisted user data remains on uninstall unless the user explicitly purges it with Scoop.
+
+All lifecycle hooks stop on errors. Close the running app with `polynya quit` before `scoop update
+polynya` or `scoop reset`: Scoop's running-process check precedes the update hook. Launch Polynya
+again after updating.
 
 Use one Polynya installation at a time. Avoid mixing Scoop, WinGet and a separately launched
 portable copy: the core is single-instance and integrations belong to that running instance.
@@ -115,10 +135,9 @@ Scoop global installation is rejected because Polynya and its integrations are p
 Test install, update, uninstall and reinstall in an isolated Scoop root/user profile before
 publishing the manifest. Check autostart on and off, agent integrations enabled and disabled,
 custom modules, an existing data directory, and paths containing spaces. Optional notify package
-activation is interactive; verify its cleanup separately on a disposable Windows account.
-The cleanup command also removes the experimental notify package during Scoop updates; users who
-enabled it must activate it again after updating. This flow needs a runtime check before shipping
-the Scoop manifest.
+activation is interactive; verify that an ordinary update keeps the existing package and that final
+uninstall removes it on a disposable Windows account. A release that changes the notification
+identity package itself may still require activation of the new package.
 
 The distribution workflow publishes the JSON in this repository's `bucket` directory after the
 release assets are public. `checkver` and `autoupdate` also describe manifest updates for Scoop
@@ -132,6 +151,8 @@ only under `target` and never executes an installer or writes the registry:
 ```powershell
 ./tools/test-package-manifests.ps1 -Winget -ScoopSchema "$HOME/scoop/apps/scoop/current/schema.json"
 ./tools/test-release-manifests.ps1
+./tools/test-scoop-lifecycle.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test-scoop-lifecycle.ps1
 ```
 
 The schema and WinGet arguments are optional. Fixture manifests use `9.9.9` and are not for
@@ -139,8 +160,12 @@ publication or installation. Runtime installation/upgrade checks still require a
 or Windows Sandbox; these checks do not replace them.
 
 The release guard check mocks GitHub CLI responses and tests published/draft/prerelease states,
-tag validation, missing/duplicate assets, download failures and hashes of downloaded fixture
-bytes without making network requests. Both checks run in CI.
+tag validation, the checked-out source commit, missing/duplicate assets, download failures and
+hashes of downloaded fixture bytes without making network requests. The Scoop lifecycle check
+uses real filesystem junctions and mocks registry/process operations. It covers upgrade, reset,
+locked old binaries, access failures, custom data and autostart ownership, including execution
+with a caller that does not stop on errors. CI runs it on both PowerShell 7 and Windows PowerShell
+5.1 alongside the manifest checks.
 
 To additionally resolve the dependencies through the installed package managers without
 installing them:
