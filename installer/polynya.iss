@@ -453,7 +453,9 @@ end;
 
 function InitializeUninstall(): Boolean;
 begin
-  Purge := SuppressibleMsgBox(CustomMessage('Purge'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES;
+  Purge := False;
+  if not UninstallSilent() then
+    Purge := SuppressibleMsgBox(CustomMessage('Purge'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES;
   Result := True;
 end;
 
