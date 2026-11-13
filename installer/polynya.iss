@@ -276,7 +276,7 @@ end;
   also when the components page was not shown (an update, a silent install). }
 function WantEverything(): Boolean;
 begin
-  Result := WizardIsComponentSelected('everything') and not EverythingInstalled();
+  Result := not WizardSilent() and WizardIsComponentSelected('everything') and not EverythingInstalled();
 end;
 
 function InitializeSetup(): Boolean;
@@ -445,9 +445,10 @@ begin
   if FirstInstall then
     Polynya('language ' + ActiveLanguage(), ewWaitUntilTerminated);
   { The package asks for UAC by itself; the island starts the module once it is in place. }
-  if Added(2) then
+  if Added(2) and not WizardSilent() then
     Polynya('notify-setup', ewWaitUntilTerminated);
-  Polynya('', ewNoWait);
+  if not WizardSilent() then
+    Polynya('', ewNoWait);
 end;
 
 function InitializeUninstall(): Boolean;
