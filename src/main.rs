@@ -1057,11 +1057,12 @@ impl App {
     }
 
     fn apply_updates(&mut self) {
-        if !HIDDEN.load(Ordering::Relaxed) && self.update_notice.is_none() {
-            if let Some((version, note)) = updates::pending_notice() {
-                self.update_notice = Some(version);
-                self.notify(note);
-            }
+        if !HIDDEN.load(Ordering::Relaxed)
+            && self.update_notice.is_none()
+            && let Some((version, note)) = updates::pending_notice()
+        {
+            self.update_notice = Some(version);
+            self.notify(note);
         }
         if self.island.menu_title(settings::MODULE) == Some(i18n::t().about) {
             self.island.menu_replace(settings::MODULE, settings::about_screen());
