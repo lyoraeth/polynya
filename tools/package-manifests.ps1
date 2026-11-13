@@ -95,11 +95,11 @@ $manifest = [ordered]@{
     pre_uninstall = [IO.File]::ReadAllLines((Join-Path $root 'packaging/scoop/pre-uninstall.ps1'))
     bin = 'polynya.exe'
     shortcuts = ,@('polynya.exe', 'Polynya')
-    persist = @('data', 'logs', 'modules')
+    persist = @('data', 'logs', 'modules', @('bundled/data', 'data'), @('bundled/logs', 'logs'))
     depends = 'extras/everything'
     checkver = @{ github = 'https://github.com/lyoraeth/polynya' }
     autoupdate = @{ architecture = [ordered]@{} }
-    notes = @('Everything is installed as a dependency; start and configure it for file search.', 'Launch Polynya after updating to restore enabled agent integrations.', 'Use one Polynya installation at a time; notify setup is optional and interactive.')
+    notes = @('Everything is installed as a dependency; start and configure it for file search.', 'Close Polynya before updating or resetting; launch it after updating.', 'Use one Polynya installation at a time; notify setup is optional and interactive.')
 }
 foreach ($entry in @(@('64bit', 'x64'), @('arm64', 'arm64'))) {
     $key, $arch = $entry

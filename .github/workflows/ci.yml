@@ -26,6 +26,9 @@ jobs:
         run: |
           ./tools/test-package-manifests.ps1
           ./tools/test-release-manifests.ps1
+          ./tools/test-scoop-lifecycle.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test-scoop-lifecycle.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell Scoop lifecycle checks failed.' }
 
   lint:
     name: Lint

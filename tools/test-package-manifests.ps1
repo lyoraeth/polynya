@@ -20,6 +20,11 @@ $manifestPath = Join-Path $generated 'scoop/bucket/polynya.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if (@($manifest.depends).Count -ne 1 -or $manifest.depends -ne 'extras/everything') { throw 'Everything must be a required Scoop dependency' }
 if ($manifest.PSObject.Properties.Name -contains 'suggest') { throw 'Required dependency is still optional' }
+foreach ($folder in 'data', 'logs') {
+    if (-not ($manifest.persist | Where-Object { $_ -is [array] -and $_[0] -eq "bundled/$folder" -and $_[1] -eq $folder })) {
+        throw "Nested module data link must be managed by Scoop persist: $folder"
+    }
+}
 $installerPath = Join-Path $generated 'winget/manifests/l/lyoraeth/Polynya/9.9.9/lyoraeth.Polynya.installer.yaml'
 $installerText = [IO.File]::ReadAllText($installerPath)
 if ($installerText -notmatch '(?m)^Dependencies:\r?\n  PackageDependencies:\r?\n  - PackageIdentifier: voidtools\.Everything\r?$') {
@@ -64,6 +69,10 @@ $preInstall = $manifest.pre_install -join "`n"
 $versionQuery = '[Environment]::OSVersion.Version'
 if (($preInstall.Split($versionQuery, [StringSplitOptions]::None).Count - 1) -ne 1) { throw 'Missing or ambiguous Windows version guard' }
 $global = $false
+function get_config([string]$Name) {
+    if ($Name -ne 'NO_JUNCTION') { throw "Unexpected Scoop setting: $Name" }
+    return $false
+}
 foreach ($os in @('6.3.9600', '10.0.19045', '10.0.21999', '10.0.22000', '10.0.26100')) {
     $dir = Join-Path $fixture "os-$os"
     New-Item -ItemType Directory -Path $dir | Out-Null
@@ -83,24 +92,6 @@ foreach ($os in @('6.3.9600', '10.0.19045', '10.0.21999', '10.0.22000', '10.0.26
 }
 Write-Output 'Scoop Windows version guard passed: 5 boundary cases.'
 
-# Exercise only file operations in a fixture; the autostart marker is absent, so no registry is changed.
-$dir = Join-Path $fixture 'portable path with spaces/current'
-$persist_dir = Join-Path $fixture 'persist'
-$global = $false
-New-Item -ItemType Directory -Path "$dir/bundled/modules/agents", "$persist_dir/data" -Force | Out-Null
-[IO.File]::WriteAllText("$dir/portable", '')
-[IO.File]::WriteAllText("$dir/bundled/modules/agents/module.toml", 'new manifest')
-& (Join-Path $root 'packaging/scoop/pre-install.ps1')
-Remove-Item -LiteralPath "$dir/modules"
-New-Item -ItemType Directory -Path "$persist_dir/modules/agents", "$persist_dir/modules/custom" -Force | Out-Null
-New-Item -ItemType Junction -Path "$dir/modules" -Target "$persist_dir/modules" | Out-Null
-[IO.File]::WriteAllText("$persist_dir/data/config.ini", 'kept settings')
-[IO.File]::WriteAllText("$persist_dir/modules/agents/module.toml", 'old manifest')
-[IO.File]::WriteAllText("$persist_dir/modules/custom/main.py", 'kept custom module')
-& (Join-Path $root 'packaging/scoop/post-install.ps1')
-if ([IO.File]::ReadAllText("$persist_dir/modules/agents/module.toml") -ne 'new manifest') { throw 'Bundled module was not updated' }
-if ([IO.File]::ReadAllText("$persist_dir/modules/custom/main.py") -ne 'kept custom module') { throw 'Custom module changed' }
-if ([IO.File]::ReadAllText("$persist_dir/data/config.ini") -ne 'kept settings') { throw 'Settings changed' }
 if ($ScoopSchema) {
     if (-not (Test-Json -Json (Get-Content -LiteralPath $manifestPath -Raw) -SchemaFile $ScoopSchema)) { throw 'Scoop schema validation failed' }
 }
@@ -128,4 +119,4 @@ if ($ResolveWingetDependency) {
     & winget show --id voidtools.Everything --exact --source winget --disable-interactivity
     if ($LASTEXITCODE -ne 0) { throw 'WinGet could not resolve the Everything dependency' }
 }
-Write-Output "Manifest generation and isolated Scoop file tests passed: $fixture"
+Write-Output "Manifest generation checks passed: $fixture"
