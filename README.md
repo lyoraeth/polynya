@@ -138,12 +138,34 @@ Test machine: Intel Core i5-10300H (4/8), integrated Intel UHD Graphics, 1920x10
 
 **Requirements:** **Windows 11** only (x64 or ARM64). Windows 10 is intentionally unsupported: the whole point of the utility depends on the new taskbar and the Mica material.
 
+### WinGet
+
+```powershell
+winget install --id lyoraeth.Polynya --exact --source winget
+```
+
+WinGet installs Polynya and the required Everything dependency. Launch Polynya from the Start menu after installation. Update with `winget upgrade --id lyoraeth.Polynya --exact`; remove with `winget uninstall --id lyoraeth.Polynya --exact`.
+
+### Scoop
+
+```powershell
+scoop bucket add extras
+scoop bucket add polynya https://github.com/lyoraeth/polynya
+scoop install polynya/polynya
+```
+
+Scoop installs the portable version with bundled modules and Everything. Launch Polynya from the Start menu or run `polynya`; start and configure Everything for file search. Update with `scoop update polynya`; remove with `scoop uninstall polynya`. Settings and logs are preserved. The experimental Windows notifications module needs reactivation after a Scoop update.
+
+Install Polynya using one of the methods below. WinGet updates may arrive with a delay; the latest version is always available in GitHub Releases.
+
+### GitHub Releases
+
 1. Download the latest build for your architecture (`x64` or `arm64`) from **[Releases](https://github.com/lyoraeth/polynya/releases)**:
    * **Installer (`Polynya-<version>-<arch>-setup.exe`)**: the main option. It installs for the current user without admin rights, lets you pick the modules and, if Everything is not there yet, installs it for file search. Running a newer installer later updates Polynya in place and keeps your settings.
    * **Portable (`…-portable.zip`)**: unpack it anywhere and run `polynya.exe`; settings and logs stay in the same folder. Modules come separately in `…-modules.zip`: unpack it into the same folder. Everything is not included.
 2. The island embeds itself into the taskbar, and a tray icon gives access to the settings.
 
-To uninstall, use **Settings → Apps → Installed apps**: Polynya removes its autostart, agent hooks and notifications package, and asks whether to delete the settings and logs too.
+To remove an installer-based installation, use **Settings → Apps → Installed apps**: Polynya removes its autostart, agent hooks and notifications package, and asks whether to delete the settings and logs too.
 
 > **"Windows protected your PC":** the builds are not code-signed yet, so SmartScreen may stop the first run of a new version. Click **More info → Run anyway**.
 

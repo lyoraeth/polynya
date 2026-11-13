@@ -138,12 +138,34 @@ Raycast 和 PowerToys 这样的启动器遵循“需要时按快捷键调用”�
 
 **系统要求：** 仅支持 **Windows 11**（x64 或 ARM64）。有意不支持 Windows 10：这个工具的核心依赖新的任务栏和 Mica 材质。
 
+### WinGet
+
+```powershell
+winget install --id lyoraeth.Polynya --exact --source winget
+```
+
+WinGet 会安装 Polynya 和必需的依赖 Everything。安装完成后，从开始菜单启动 Polynya。更新：`winget upgrade --id lyoraeth.Polynya --exact`；卸载：`winget uninstall --id lyoraeth.Polynya --exact`。
+
+### Scoop
+
+```powershell
+scoop bucket add extras
+scoop bucket add polynya https://github.com/lyoraeth/polynya
+scoop install polynya/polynya
+```
+
+Scoop 会安装包含随附模块的便携版和 Everything。从开始菜单或运行 `polynya` 启动 Polynya；文件搜索还需要启动并配置 Everything。更新：`scoop update polynya`；卸载：`scoop uninstall polynya`。设置和日志会保留。通过 Scoop 更新后，需要重新启用实验性的 Windows 通知模块。
+
+请选择下方的一种方式安装 Polynya。WinGet 更新可能有所延迟；最新版本始终可在 GitHub Releases 获取。
+
+### GitHub Releases
+
 1. 从 **[Releases](https://github.com/lyoraeth/polynya/releases)** 下载对应架构（`x64` 或 `arm64`）的最新版本：
    * **安装程序（`Polynya-<版本>-<arch>-setup.exe`）**：推荐方式。为当前用户安装，不需要管理员权限，可以选择要安装的模块；如果还没有 Everything，可以一并安装它用于文件搜索。之后运行新版本的安装程序即可原地更新，设置会保留。
    * **便携版（`…-portable.zip`）**：解压到任意位置并运行 `polynya.exe`，设置和日志都保存在同一文件夹中。模块单独放在 `…-modules.zip` 中，解压到同一文件夹即可。不包含 Everything。
 2. “岛”会自动嵌入任务栏，托盘中会出现用于打开设置的图标。
 
-卸载请前往 **设置 → 应用 → 已安装的应用**：Polynya 会移除自启动、AI 代理钩子和通知包，并询问是否一并删除设置和日志。
+通过安装程序安装的版本，请前往 **设置 → 应用 → 已安装的应用** 卸载：Polynya 会移除自启动、AI 代理钩子和通知包，并询问是否一并删除设置和日志。
 
 > **“Windows 已保护你的电脑”：** 目前构建尚未签名，SmartScreen 可能会拦截新版本的首次运行。点击 **更多信息 → 仍要运行** 即可。
 

@@ -138,12 +138,34 @@ Raycast や PowerToys のようなランチャーは「必要なときにホッ�
 
 **動作要件：** **Windows 11** のみ（x64 または ARM64）。Windows 10 は意図的に非対応です。このツールの核心は新しいタスクバーと Mica 素材に依存しているためです。
 
+### WinGet
+
+```powershell
+winget install --id lyoraeth.Polynya --exact --source winget
+```
+
+WinGet は Polynya と必須の依存ソフト Everything をインストールします。完了後、スタートメニューから Polynya を起動してください。更新は `winget upgrade --id lyoraeth.Polynya --exact`、削除は `winget uninstall --id lyoraeth.Polynya --exact` です。
+
+### Scoop
+
+```powershell
+scoop bucket add extras
+scoop bucket add polynya https://github.com/lyoraeth/polynya
+scoop install polynya/polynya
+```
+
+Scoop は同梱モジュール付きのポータブル版と Everything をインストールします。スタートメニューまたは `polynya` コマンドで起動し、ファイル検索には Everything も起動・設定してください。更新は `scoop update polynya`、削除は `scoop uninstall polynya` です。設定とログは保持されます。Scoop で更新した後は、試験的な Windows 通知モジュールを再度有効化する必要があります。
+
+以下のいずれかの方法で Polynya をインストールしてください。WinGet での更新には遅れが生じる場合があります。最新版は常に GitHub Releases から入手できます。
+
+### GitHub Releases
+
 1. **[Releases](https://github.com/lyoraeth/polynya/releases)** から、お使いのアーキテクチャ（`x64` または `arm64`）用の最新ビルドをダウンロードします。
    * **インストーラー（`Polynya-<バージョン>-<arch>-setup.exe`）**：基本の選択肢です。管理者権限なしで現在のユーザーにインストールし、モジュールを選べます。Everything がまだなければ、ファイル検索用に一緒にインストールできます。あとで新しいバージョンのインストーラーを実行すると、設定を残したまま上書き更新されます。
    * **ポータブル版（`…-portable.zip`）**：好きな場所に展開して `polynya.exe` を起動します。設定とログは同じフォルダーに保存されます。モジュールは別の `…-modules.zip` に入っているので、同じフォルダーに展開してください。Everything は含まれません。
 2. アイランドが自動的にタスクバーに組み込まれ、トレイに設定用のアイコンが表示されます。
 
-アンインストールは **設定 → アプリ → インストールされているアプリ** から行います。Polynya は自動起動、AI エージェントのフック、通知パッケージを取り除き、設定とログも削除するかを確認します。
+インストーラー版のアンインストールは **設定 → アプリ → インストールされているアプリ** から行います。Polynya は自動起動、AI エージェントのフック、通知パッケージを取り除き、設定とログも削除するかを確認します。
 
 > **「Windows によって PC が保護されました」：** ビルドにはまだコード署名がないため、新しいバージョンの初回起動を SmartScreen が止めることがあります。**詳細情報 → 実行** をクリックしてください。
 
