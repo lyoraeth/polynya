@@ -1,0 +1,161 @@
+{
+  "version": "1.2.0",
+  "description": "A taskbar island and launcher for Windows 11.",
+  "homepage": "https://github.com/lyoraeth/polynya",
+  "license": "GPL-3.0-or-later",
+  "architecture": {
+    "64bit": {
+      "url": [
+        "https://github.com/lyoraeth/polynya/releases/download/v1.2.0/Polynya-1.2.0-x64-portable.zip",
+        "https://github.com/lyoraeth/polynya/releases/download/v1.2.0/Polynya-1.2.0-x64-modules.zip"
+      ],
+      "hash": [
+        "898214D1E3AB713D8B5F579B4F64E7DADED6C790747E5AFDC2542C9E76BA4C5B",
+        "E6850C96B9B1AED71CF7A94464D6DCD2C9375553075BEEA946AC90E02948A566"
+      ]
+    },
+    "arm64": {
+      "url": [
+        "https://github.com/lyoraeth/polynya/releases/download/v1.2.0/Polynya-1.2.0-arm64-portable.zip",
+        "https://github.com/lyoraeth/polynya/releases/download/v1.2.0/Polynya-1.2.0-arm64-modules.zip"
+      ],
+      "hash": [
+        "89814C6C4028B073942C27AD9BB75767A4F62CC951DD678EA6B9BAB1E0D8EB96",
+        "91091DC7AB143D74D724E0462FD888C58BA70BD467ADF98B2F94343950DCA788"
+      ]
+    }
+  },
+  "extract_to": [
+    "",
+    "bundled"
+  ],
+  "pre_install": [
+    "$ErrorActionPreference = 'Stop'",
+    "if ($global) { throw 'Polynya supports per-user Scoop installations only.' }",
+    "if ([Environment]::OSVersion.Version -lt [version]'10.0.22000') {",
+    "    throw 'Polynya requires Windows 11 (build 22000 or newer). Windows 10 is not supported.'",
+    "}",
+    "if (-not (Test-Path -LiteralPath \"$dir/portable\")) { throw 'Portable marker is missing.' }",
+    "if (get_config NO_JUNCTION) { throw 'Polynya requires Scoop current junctions; disable no_junction and retry.' }",
+    "foreach ($folder in 'data', 'logs', 'modules', 'bundled/data', 'bundled/logs') {",
+    "    New-Item -ItemType Directory -Path (Join-Path $dir $folder) -Force | Out-Null",
+    "}"
+  ],
+  "post_install": [
+    "$ErrorActionPreference = 'Stop'",
+    "$bundled = Join-Path $dir 'bundled/modules'",
+    "if (-not (Test-Path -LiteralPath $bundled)) { throw 'Bundled modules are missing.' }",
+    "$appRoot = Split-Path -Parent $dir",
+    "$current = Join-Path $appRoot 'current'",
+    "if (-not (Test-Path -LiteralPath \"$current/portable\")) { throw 'Scoop current junction is missing.' }",
+    "foreach ($folder in 'data', 'logs') {",
+    "    if (-not (Test-Path -LiteralPath \"$persist_dir/$folder\" -PathType Container)) { throw \"Persisted directory is missing: $folder\" }",
+    "}",
+    "# Module images may be resolved through junctions by Windows; both physical roots need portable data.",
+    "New-Item -ItemType File -Path \"$persist_dir/portable\" -Force | Out-Null",
+    "New-Item -ItemType File -Path \"$dir/bundled/portable\" -Force | Out-Null",
+    "$dataLinks = foreach ($folder in 'data', 'logs') {",
+    "    @{ Path = Join-Path \"$dir/bundled\" $folder; Target = [IO.Path]::GetFullPath(\"$persist_dir/$folder\") }",
+    "}",
+    "# Only the links are persisted: reset switches core and bundled binaries together, without hooks.",
+    "$modules = @(Get-ChildItem -LiteralPath $bundled -Directory)",
+    "if (-not $modules.Count) { throw 'Bundled modules are missing.' }",
+    "$moduleLinks = foreach ($module in $modules) {",
+    "    $destination = Join-Path \"$dir/modules\" $module.Name",
+    "    $target = [IO.Path]::GetFullPath((Join-Path \"$current/bundled/modules\" $module.Name))",
+    "    if (-not (Test-Path -LiteralPath \"$($module.FullName)/module.toml\")) { throw \"Bundled module manifest is missing: $($module.Name)\" }",
+    "    @{ Path = $destination; Target = $target }",
+    "}",
+    "$missingLinks = foreach ($link in @($dataLinks) + @($moduleLinks)) {",
+    "    $existing = Get-Item -LiteralPath $link.Path -Force -ErrorAction SilentlyContinue",
+    "    $targets = @($existing.Target)",
+    "    if ($existing -and ($existing.LinkType -ne 'Junction' -or $targets.Count -ne 1 -or $targets[0] -ine $link.Target)) {",
+    "        throw \"Path conflicts with the Scoop module link: $($link.Path)\"",
+    "    }",
+    "    if (-not $existing) { $link }",
+    "}",
+    "foreach ($link in $missingLinks) {",
+    "    New-Item -ItemType Junction -Path $link.Path -Target $link.Target | Out-Null",
+    "}",
+    "$marker = Join-Path $persist_dir 'autostart.enabled'",
+    "if (Test-Path -LiteralPath $marker) {",
+    "    $runKey = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run'",
+    "    $registered = (Get-ItemProperty -LiteralPath $runKey -Name Polynya -ErrorAction SilentlyContinue).Polynya",
+    "    if (-not $registered -or $registered.Trim('\"').StartsWith(\"$appRoot\\\", [StringComparison]::OrdinalIgnoreCase)) {",
+    "        New-Item -Path $runKey -Force | Out-Null",
+    "        Set-ItemProperty -LiteralPath $runKey -Name Polynya -Value \"`\"$dir\\polynya.exe`\"\"",
+    "    }",
+    "    Remove-Item -LiteralPath $marker -Force",
+    "}"
+  ],
+  "pre_uninstall": [
+    "$ErrorActionPreference = 'Stop'",
+    "if ($cmd -notin @('update', 'uninstall')) { throw \"Unsupported Scoop lifecycle command: $cmd\" }",
+    "$appRoot = Split-Path -Parent $dir",
+    "$runKey = 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run'",
+    "$registered = (Get-ItemProperty -LiteralPath $runKey -Name Polynya -ErrorAction SilentlyContinue).Polynya",
+    "$ownsAutostart = $registered -and $registered.Trim('\"').StartsWith(\"$appRoot\\\", [StringComparison]::OrdinalIgnoreCase)",
+    "if ($cmd -eq 'update' -and $ownsAutostart) {",
+    "    New-Item -ItemType Directory -Path $persist_dir -Force | Out-Null",
+    "    New-Item -ItemType File -Path \"$persist_dir/autostart.enabled\" -Force | Out-Null",
+    "}",
+    "$command = if ($cmd -eq 'update') { 'quit' } else { 'uninstall' }",
+    "$process = Start-Process -FilePath \"$dir/polynya.exe\" -ArgumentList $command -WindowStyle Hidden -PassThru -Wait",
+    "if ($process.ExitCode -ne 0) { throw \"Polynya cleanup failed: $($process.ExitCode)\" }",
+    "if (Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith(\"$appRoot\\\", [StringComparison]::OrdinalIgnoreCase) }) {",
+    "    throw 'Polynya processes are still running; close them and retry.'",
+    "}",
+    "if ($cmd -eq 'update') { return }",
+    "# Scoop invokes the versioned exe, while autostart may point through the current junction.",
+    "if ($ownsAutostart -and (Get-ItemProperty -LiteralPath $runKey -Name Polynya -ErrorAction SilentlyContinue).Polynya -eq $registered) {",
+    "    Remove-ItemProperty -LiteralPath $runKey -Name Polynya -ErrorAction Stop",
+    "}",
+    "$marker = Join-Path $persist_dir 'autostart.enabled'",
+    "if (Test-Path -LiteralPath $marker) { Remove-Item -LiteralPath $marker -Force }"
+  ],
+  "bin": "polynya.exe",
+  "shortcuts": [
+    [
+      "polynya.exe",
+      "Polynya"
+    ]
+  ],
+  "persist": [
+    "data",
+    "logs",
+    "modules",
+    [
+      "bundled/data",
+      "data"
+    ],
+    [
+      "bundled/logs",
+      "logs"
+    ]
+  ],
+  "depends": "extras/everything",
+  "checkver": {
+    "github": "https://github.com/lyoraeth/polynya"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": [
+          "https://github.com/lyoraeth/polynya/releases/download/v$version/Polynya-$version-x64-portable.zip",
+          "https://github.com/lyoraeth/polynya/releases/download/v$version/Polynya-$version-x64-modules.zip"
+        ]
+      },
+      "arm64": {
+        "url": [
+          "https://github.com/lyoraeth/polynya/releases/download/v$version/Polynya-$version-arm64-portable.zip",
+          "https://github.com/lyoraeth/polynya/releases/download/v$version/Polynya-$version-arm64-modules.zip"
+        ]
+      }
+    }
+  },
+  "notes": [
+    "Everything is installed as a dependency; start and configure it for file search.",
+    "Close Polynya before updating or resetting; launch it after updating.",
+    "Use one Polynya installation at a time; notify setup is optional and interactive."
+  ]
+}
