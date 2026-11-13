@@ -16,6 +16,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  packaging:
+    name: Package manifest checks
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check manifest generation and release guards
+        shell: pwsh
+        run: |
+          ./tools/test-package-manifests.ps1
+          ./tools/test-release-manifests.ps1
+
   lint:
     name: Lint
     runs-on: windows-latest

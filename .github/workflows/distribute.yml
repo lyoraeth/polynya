@@ -1,0 +1,143 @@
+# Copyright (c) Danil Klimov (lyoraeth)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Distribute packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable release tag (vX.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-packages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  manifests:
+    name: Generate manifests from release assets
+    if: github.repository == 'lyoraeth/polynya' && (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.generate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Download release and generate manifests
+        id: generate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          $generated = ./tools/release-manifests.ps1 -Tag $env:RELEASE_TAG
+          Invoke-WebRequest https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json -OutFile target/scoop.schema.json
+          if (-not (Test-Json -Json (Get-Content "$generated/scoop/bucket/polynya.json" -Raw) -SchemaFile target/scoop.schema.json)) {
+            throw 'Scoop schema validation failed.'
+          }
+          $version = $env:RELEASE_TAG.Substring(1)
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "Generated manifests for $version from the published release assets." >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: package-manifests-${{ steps.generate.outputs.version }}
+          path: target/package-manifests/${{ steps.generate.outputs.version }}/
+          if-no-files-found: error
+
+  scoop:
+    name: Update Scoop bucket
+    needs: manifests
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: package-manifests-${{ needs.manifests.outputs.version }}
+          path: target/manifests
+      - name: Publish bucket manifest
+        env:
+          RELEASE_VERSION: ${{ needs.manifests.outputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = 'target/manifests/scoop/bucket/polynya.json'
+          $destination = 'bucket/polynya.json'
+          $manifest = Get-Content -LiteralPath $source -Raw | ConvertFrom-Json
+          if ($manifest.version -cne $env:RELEASE_VERSION) { throw 'Scoop artifact version mismatch.' }
+          if (Test-Path -LiteralPath $destination) {
+            $current = Get-Content -LiteralPath $destination -Raw | ConvertFrom-Json
+            if ([version]$current.version -gt [version]$manifest.version) {
+              'Scoop already has a newer version; leaving it in place.' >> $env:GITHUB_STEP_SUMMARY
+              exit 0
+            }
+            if ($current.version -eq $manifest.version) {
+              if (($current | ConvertTo-Json -Depth 12 -Compress) -cne ($manifest | ConvertTo-Json -Depth 12 -Compress)) {
+                throw 'This Scoop version was already published with different contents.'
+              }
+              'This Scoop version is already published.' >> $env:GITHUB_STEP_SUMMARY
+              exit 0
+            }
+          }
+          New-Item -ItemType Directory -Path bucket -Force | Out-Null
+          Copy-Item -LiteralPath $source -Destination $destination
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- $destination
+          if ($LASTEXITCODE -ne 0) { throw "git add: $LASTEXITCODE" }
+          git commit -m "Chore: Update Scoop manifest to $env:RELEASE_VERSION" -- $destination
+          if ($LASTEXITCODE -ne 0) { throw "git commit: $LASTEXITCODE" }
+          git push origin "HEAD:refs/heads/$env:DEFAULT_BRANCH"
+          if ($LASTEXITCODE -ne 0) { throw 'Bucket push failed. Check branch rules, then retry the workflow.' }
+          "Scoop bucket updated to $env:RELEASE_VERSION." >> $env:GITHUB_STEP_SUMMARY
+
+  winget:
+    name: Submit WinGet manifest
+    needs: manifests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: package-manifests-${{ needs.manifests.outputs.version }}
+          path: manifests
+      - name: Check token
+        env:
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) {
+            throw 'Add the WINGET_TOKEN repository secret: a classic GitHub PAT with public_repo scope.'
+          }
+      - name: Submit to microsoft/winget-pkgs
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          RELEASE_VERSION: ${{ needs.manifests.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $title = "New version: lyoraeth.Polynya version $env:RELEASE_VERSION"
+          $existing = gh pr list --repo microsoft/winget-pkgs --state all --search "in:title $title" --json title,url,state --limit 100
+          if ($LASTEXITCODE -ne 0) { throw "gh pr list: $LASTEXITCODE" }
+          $matching = @($existing | ConvertFrom-Json | Where-Object { $_.title -ceq $title -and $_.state -in @('OPEN', 'MERGED') })
+          if ($matching.Count) {
+            $matching | ForEach-Object { "WinGet PR already exists: $($_.url)" >> $env:GITHUB_STEP_SUMMARY }
+            exit 0
+          }
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          ./wingetcreate.exe submit "manifests/winget/manifests/l/lyoraeth/Polynya/$env:RELEASE_VERSION" --prtitle $title --no-open
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate submit: $LASTEXITCODE" }
+          "WinGet manifest validated and submitted for $env:RELEASE_VERSION; catalog acceptance is handled by Microsoft." >> $env:GITHUB_STEP_SUMMARY
